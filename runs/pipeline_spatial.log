@@ -1,0 +1,123 @@
+### SPATIAL TRAIN CV-A ###
+  [spatial] loaded cache runs/real_cache_spatial/scene001_b4_646b3a3a2f.npz  N=6000
+  [spatial] loaded cache runs/real_cache_spatial/scene002_b4_0efa9d61da.npz  N=6000
+[spatial CV-A] train=6000 val=6000 patches P=16 T=700
+=== training spatial K=128 (P*T/K=87.5x, per-pixel-equiv K=8) ===
+  [spatial K=128] ep 1/30 train=0.16644 val_mse=0.010364
+  [spatial K=128] ep 5/30 train=0.04113 val_mse=0.003269
+  [spatial K=128] ep 10/30 train=0.03161 val_mse=0.002519
+  [spatial K=128] ep 15/30 train=0.02794 val_mse=0.002336
+  [spatial K=128] ep 20/30 train=0.02583 val_mse=0.002263
+  [spatial K=128] ep 25/30 train=0.02435 val_mse=0.002202
+  [spatial K=128] ep 30/30 train=0.02303 val_mse=0.002192
+  [spatial K=128] done in 175.2s  final val_mse=0.002192
+=== training spatial K=256 (P*T/K=43.8x, per-pixel-equiv K=16) ===
+  [spatial K=256] ep 1/30 train=0.15941 val_mse=0.008825
+  [spatial K=256] ep 5/30 train=0.03876 val_mse=0.003064
+  [spatial K=256] ep 10/30 train=0.03054 val_mse=0.002504
+  [spatial K=256] ep 15/30 train=0.02628 val_mse=0.002361
+  [spatial K=256] ep 20/30 train=0.02417 val_mse=0.002261
+  [spatial K=256] ep 25/30 train=0.02275 val_mse=0.002168
+  [spatial K=256] ep 30/30 train=0.02157 val_mse=0.002122
+  [spatial K=256] done in 174.3s  final val_mse=0.002122
+=== training spatial K=512 (P*T/K=21.9x, per-pixel-equiv K=32) ===
+  [spatial K=512] ep 1/30 train=0.14436 val_mse=0.007032
+  [spatial K=512] ep 5/30 train=0.03548 val_mse=0.002878
+  [spatial K=512] ep 10/30 train=0.02774 val_mse=0.002413
+  [spatial K=512] ep 15/30 train=0.02461 val_mse=0.002267
+  [spatial K=512] ep 20/30 train=0.02259 val_mse=0.002170
+  [spatial K=512] ep 25/30 train=0.02148 val_mse=0.002109
+  [spatial K=512] ep 30/30 train=0.02056 val_mse=0.002023
+  [spatial K=512] done in 172.4s  final val_mse=0.002023
+=== training spatial K=1024 (P*T/K=10.9x, per-pixel-equiv K=64) ===
+  [spatial K=1024] ep 1/30 train=0.14516 val_mse=0.006410
+  [spatial K=1024] ep 5/30 train=0.03800 val_mse=0.002832
+  [spatial K=1024] ep 10/30 train=0.03110 val_mse=0.002421
+  [spatial K=1024] ep 15/30 train=0.02744 val_mse=0.002235
+  [spatial K=1024] ep 20/30 train=0.02566 val_mse=0.002120
+  [spatial K=1024] ep 25/30 train=0.02453 val_mse=0.002037
+  [spatial K=1024] ep 30/30 train=0.02372 val_mse=0.001982
+  [spatial K=1024] done in 174.8s  final val_mse=0.001982
+=== training spatial K=2048 (P*T/K=5.5x, per-pixel-equiv K=128) ===
+  [spatial K=2048] ep 1/30 train=0.12560 val_mse=0.005265
+  [spatial K=2048] ep 5/30 train=0.03733 val_mse=0.002656
+  [spatial K=2048] ep 10/30 train=0.03071 val_mse=0.002333
+  [spatial K=2048] ep 15/30 train=0.02773 val_mse=0.002183
+  [spatial K=2048] ep 20/30 train=0.02606 val_mse=0.002081
+  [spatial K=2048] ep 25/30 train=0.02480 val_mse=0.001992
+  [spatial K=2048] ep 30/30 train=0.02386 val_mse=0.001942
+  [spatial K=2048] done in 174.9s  final val_mse=0.001942
+All spatial training done. Checkpoints under runs/real_A_spatial/
+### SPATIAL EVAL CV-A ###
+  [spatial] loaded cache runs/real_cache_spatial/scene002_b4_0efa9d61da.npz  N=6000
+[spatial CV-A] eval on scene002: 6000 patches -> 88878 labelled pixels
+[upper bound] survival(object=0.998 glass=0.972 ghost=0.977)  ghost_int_rel=0.009 thr=7.0
+[spatial K= 128 (eqK=  8)] CR= 87.5x mse=2.07e-03 | survival obj=0.99 glass=0.96 GHOST=0.91 | ghost-fidelity int=0.33 fwhm=0.33
+[spatial K= 256 (eqK= 16)] CR= 43.8x mse=2.01e-03 | survival obj=1.00 glass=0.96 GHOST=0.92 | ghost-fidelity int=0.31 fwhm=0.33
+[spatial K= 512 (eqK= 32)] CR= 21.9x mse=1.91e-03 | survival obj=0.99 glass=0.97 GHOST=0.92 | ghost-fidelity int=0.30 fwhm=0.32
+[spatial K=1024 (eqK= 64)] CR= 10.9x mse=1.88e-03 | survival obj=0.99 glass=0.96 GHOST=0.92 | ghost-fidelity int=0.28 fwhm=0.32
+[spatial K=2048 (eqK=128)] CR=  5.5x mse=1.84e-03 | survival obj=0.99 glass=0.94 GHOST=0.92 | ghost-fidelity int=0.28 fwhm=0.31
+
+Done. Summary -> runs/real_A_spatial/summary.json, plots -> runs/real_A_spatial/sweep*.png
+### SPATIAL TRAIN CV-B ###
+  [spatial] loaded cache runs/real_cache_spatial/scene002_b4_5ba41a28c5.npz  N=6000
+  [spatial] loaded cache runs/real_cache_spatial/scene001_b4_d26a3fae40.npz  N=6000
+[spatial CV-B] train=6000 val=6000 patches P=16 T=700
+=== training spatial K=128 (P*T/K=87.5x, per-pixel-equiv K=8) ===
+  [spatial K=128] ep 1/30 train=0.14181 val_mse=0.012767
+  [spatial K=128] ep 5/30 train=0.04200 val_mse=0.006720
+  [spatial K=128] ep 10/30 train=0.03354 val_mse=0.005586
+  [spatial K=128] ep 15/30 train=0.02846 val_mse=0.005289
+  [spatial K=128] ep 20/30 train=0.02499 val_mse=0.005150
+  [spatial K=128] ep 25/30 train=0.02251 val_mse=0.005082
+  [spatial K=128] ep 30/30 train=0.02063 val_mse=0.005005
+  [spatial K=128] done in 169.5s  final val_mse=0.005005
+=== training spatial K=256 (P*T/K=43.8x, per-pixel-equiv K=16) ===
+  [spatial K=256] ep 1/30 train=0.13805 val_mse=0.011443
+  [spatial K=256] ep 5/30 train=0.04143 val_mse=0.006490
+  [spatial K=256] ep 10/30 train=0.03218 val_mse=0.005475
+  [spatial K=256] ep 15/30 train=0.02690 val_mse=0.005239
+  [spatial K=256] ep 20/30 train=0.02366 val_mse=0.005084
+  [spatial K=256] ep 25/30 train=0.02122 val_mse=0.004983
+  [spatial K=256] ep 30/30 train=0.01943 val_mse=0.004924
+  [spatial K=256] done in 173.4s  final val_mse=0.004924
+=== training spatial K=512 (P*T/K=21.9x, per-pixel-equiv K=32) ===
+  [spatial K=512] ep 1/30 train=0.12637 val_mse=0.010135
+  [spatial K=512] ep 5/30 train=0.03892 val_mse=0.006244
+  [spatial K=512] ep 10/30 train=0.03033 val_mse=0.005457
+  [spatial K=512] ep 15/30 train=0.02500 val_mse=0.005230
+  [spatial K=512] ep 20/30 train=0.02158 val_mse=0.005096
+  [spatial K=512] ep 25/30 train=0.01965 val_mse=0.005050
+  [spatial K=512] ep 30/30 train=0.01829 val_mse=0.004998
+  [spatial K=512] done in 169.6s  final val_mse=0.004998
+=== training spatial K=1024 (P*T/K=10.9x, per-pixel-equiv K=64) ===
+  [spatial K=1024] ep 1/30 train=0.12695 val_mse=0.010166
+  [spatial K=1024] ep 5/30 train=0.03850 val_mse=0.006643
+  [spatial K=1024] ep 10/30 train=0.02845 val_mse=0.006001
+  [spatial K=1024] ep 15/30 train=0.02297 val_mse=0.005820
+  [spatial K=1024] ep 20/30 train=0.02014 val_mse=0.005707
+  [spatial K=1024] ep 25/30 train=0.01839 val_mse=0.005634
+  [spatial K=1024] ep 30/30 train=0.01757 val_mse=0.005605
+  [spatial K=1024] done in 169.0s  final val_mse=0.005605
+=== training spatial K=2048 (P*T/K=5.5x, per-pixel-equiv K=128) ===
+  [spatial K=2048] ep 1/30 train=0.10783 val_mse=0.009030
+  [spatial K=2048] ep 5/30 train=0.03781 val_mse=0.006152
+  [spatial K=2048] ep 10/30 train=0.02766 val_mse=0.005585
+  [spatial K=2048] ep 15/30 train=0.02286 val_mse=0.005449
+  [spatial K=2048] ep 20/30 train=0.02082 val_mse=0.005363
+  [spatial K=2048] ep 25/30 train=0.01980 val_mse=0.005317
+  [spatial K=2048] ep 30/30 train=0.01914 val_mse=0.005312
+  [spatial K=2048] done in 169.7s  final val_mse=0.005312
+All spatial training done. Checkpoints under runs/real_B_spatial/
+### SPATIAL EVAL CV-B ###
+  [spatial] loaded cache runs/real_cache_spatial/scene001_b4_d26a3fae40.npz  N=6000
+[spatial CV-B] eval on scene001: 6000 patches -> 90762 labelled pixels
+[upper bound] survival(object=0.993 glass=0.997 ghost=0.976)  ghost_int_rel=0.046 thr=9.0
+[spatial K= 128 (eqK=  8)] CR= 87.5x mse=5.10e-03 | survival obj=0.96 glass=0.95 GHOST=0.49 | ghost-fidelity int=0.51 fwhm=0.41
+[spatial K= 256 (eqK= 16)] CR= 43.8x mse=5.02e-03 | survival obj=0.95 glass=0.97 GHOST=0.50 | ghost-fidelity int=0.54 fwhm=0.44
+[spatial K= 512 (eqK= 32)] CR= 21.9x mse=5.09e-03 | survival obj=0.94 glass=0.89 GHOST=0.71 | ghost-fidelity int=0.53 fwhm=0.45
+[spatial K=1024 (eqK= 64)] CR= 10.9x mse=5.71e-03 | survival obj=0.92 glass=0.97 GHOST=0.58 | ghost-fidelity int=0.54 fwhm=0.45
+[spatial K=2048 (eqK=128)] CR=  5.5x mse=5.42e-03 | survival obj=0.92 glass=0.92 GHOST=0.48 | ghost-fidelity int=0.55 fwhm=0.46
+
+Done. Summary -> runs/real_B_spatial/summary.json, plots -> runs/real_B_spatial/sweep*.png
+### SPATIAL ALL DONE ###

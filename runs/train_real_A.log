@@ -1,0 +1,184 @@
+  [real] loaded cache runs/real_cache/scene001_ff61167f26.npz  N=75000
+  [real] loaded cache runs/real_cache/scene002_09d117fe8f.npz  N=75000
+[real CV-A] train=75000 val=5000 T=700
+=== training coarse_binning K=8 (T/K=87.5x) ===
+  [coarse_binning K=8] ep 1/30 train=0.16377 val_mse=0.017269
+  [coarse_binning K=8] ep 5/30 train=0.13633 val_mse=0.017846
+  [coarse_binning K=8] ep 10/30 train=0.12930 val_mse=0.017289
+  [coarse_binning K=8] ep 15/30 train=0.12836 val_mse=0.016188
+  [coarse_binning K=8] ep 20/30 train=0.12772 val_mse=0.016189
+  [coarse_binning K=8] ep 25/30 train=0.12502 val_mse=0.016106
+  [coarse_binning K=8] ep 30/30 train=0.12467 val_mse=0.015821
+  [coarse_binning K=8] done in 257.6s  final val_mse=0.015821
+=== training coarse_binning K=16 (T/K=43.8x) ===
+  [coarse_binning K=16] ep 1/30 train=0.14323 val_mse=0.012228
+  [coarse_binning K=16] ep 5/30 train=0.10252 val_mse=0.011668
+  [coarse_binning K=16] ep 10/30 train=0.09748 val_mse=0.011312
+  [coarse_binning K=16] ep 15/30 train=0.09547 val_mse=0.011164
+  [coarse_binning K=16] ep 20/30 train=0.09371 val_mse=0.010817
+  [coarse_binning K=16] ep 25/30 train=0.09307 val_mse=0.010986
+  [coarse_binning K=16] ep 30/30 train=0.09244 val_mse=0.011062
+  [coarse_binning K=16] done in 187.7s  final val_mse=0.011062
+=== training coarse_binning K=32 (T/K=21.9x) ===
+  [coarse_binning K=32] ep 1/30 train=0.11240 val_mse=0.006499
+  [coarse_binning K=32] ep 5/30 train=0.07316 val_mse=0.005353
+  [coarse_binning K=32] ep 10/30 train=0.06507 val_mse=0.005253
+  [coarse_binning K=32] ep 15/30 train=0.06332 val_mse=0.005253
+  [coarse_binning K=32] ep 20/30 train=0.06158 val_mse=0.005049
+  [coarse_binning K=32] ep 25/30 train=0.06069 val_mse=0.005049
+  [coarse_binning K=32] ep 30/30 train=0.06005 val_mse=0.004950
+  [coarse_binning K=32] done in 141.2s  final val_mse=0.004950
+=== training coarse_binning K=64 (T/K=10.9x) ===
+  [coarse_binning K=64] ep 1/30 train=0.08951 val_mse=0.002464
+  [coarse_binning K=64] ep 5/30 train=0.04910 val_mse=0.001738
+  [coarse_binning K=64] ep 10/30 train=0.04771 val_mse=0.001634
+  [coarse_binning K=64] ep 15/30 train=0.04462 val_mse=0.001550
+  [coarse_binning K=64] ep 20/30 train=0.04340 val_mse=0.001537
+  [coarse_binning K=64] ep 25/30 train=0.04268 val_mse=0.001549
+  [coarse_binning K=64] ep 30/30 train=0.04135 val_mse=0.001621
+  [coarse_binning K=64] done in 234.9s  final val_mse=0.001621
+=== training coarse_binning K=128 (T/K=5.5x) ===
+  [coarse_binning K=128] ep 1/30 train=0.08897 val_mse=0.003252
+  [coarse_binning K=128] ep 5/30 train=0.05786 val_mse=0.002972
+  [coarse_binning K=128] ep 10/30 train=0.05677 val_mse=0.002932
+  [coarse_binning K=128] ep 15/30 train=0.05623 val_mse=0.002752
+  [coarse_binning K=128] ep 20/30 train=0.05074 val_mse=0.002489
+  [coarse_binning K=128] ep 25/30 train=0.05019 val_mse=0.002492
+  [coarse_binning K=128] ep 30/30 train=0.04697 val_mse=0.002484
+  [coarse_binning K=128] done in 242.6s  final val_mse=0.002484
+=== training random_projection K=8 (T/K=87.5x) ===
+  [random_projection K=8] ep 1/30 train=0.10922 val_mse=0.009376
+  [random_projection K=8] ep 5/30 train=0.06862 val_mse=0.007275
+  [random_projection K=8] ep 10/30 train=0.06584 val_mse=0.006879
+  [random_projection K=8] ep 15/30 train=0.06453 val_mse=0.006587
+  [random_projection K=8] ep 20/30 train=0.06378 val_mse=0.006811
+  [random_projection K=8] ep 25/30 train=0.06319 val_mse=0.006578
+  [random_projection K=8] ep 30/30 train=0.06218 val_mse=0.006602
+  [random_projection K=8] done in 236.7s  final val_mse=0.006602
+=== training random_projection K=16 (T/K=43.8x) ===
+  [random_projection K=16] ep 1/30 train=0.09332 val_mse=0.004030
+  [random_projection K=16] ep 5/30 train=0.05329 val_mse=0.003040
+  [random_projection K=16] ep 10/30 train=0.04878 val_mse=0.002858
+  [random_projection K=16] ep 15/30 train=0.04815 val_mse=0.002764
+  [random_projection K=16] ep 20/30 train=0.04626 val_mse=0.002721
+  [random_projection K=16] ep 25/30 train=0.04277 val_mse=0.002604
+  [random_projection K=16] ep 30/30 train=0.03884 val_mse=0.002415
+  [random_projection K=16] done in 231.0s  final val_mse=0.002415
+=== training random_projection K=32 (T/K=21.9x) ===
+  [random_projection K=32] ep 1/30 train=0.06436 val_mse=0.002851
+  [random_projection K=32] ep 5/30 train=0.03425 val_mse=0.002216
+  [random_projection K=32] ep 10/30 train=0.03333 val_mse=0.002027
+  [random_projection K=32] ep 15/30 train=0.02821 val_mse=0.001871
+  [random_projection K=32] ep 20/30 train=0.02804 val_mse=0.001845
+  [random_projection K=32] ep 25/30 train=0.02789 val_mse=0.001844
+  [random_projection K=32] ep 30/30 train=0.02780 val_mse=0.001837
+  [random_projection K=32] done in 237.9s  final val_mse=0.001837
+=== training random_projection K=64 (T/K=10.9x) ===
+  [random_projection K=64] ep 1/30 train=0.05656 val_mse=0.002054
+  [random_projection K=64] ep 5/30 train=0.03135 val_mse=0.001680
+  [random_projection K=64] ep 10/30 train=0.02656 val_mse=0.001611
+  [random_projection K=64] ep 15/30 train=0.02376 val_mse=0.001579
+  [random_projection K=64] ep 20/30 train=0.02362 val_mse=0.001562
+  [random_projection K=64] ep 25/30 train=0.02353 val_mse=0.001550
+  [random_projection K=64] ep 30/30 train=0.02347 val_mse=0.001539
+  [random_projection K=64] done in 236.1s  final val_mse=0.001539
+=== training random_projection K=128 (T/K=5.5x) ===
+  [random_projection K=128] ep 1/30 train=0.05499 val_mse=0.001709
+  [random_projection K=128] ep 5/30 train=0.03308 val_mse=0.001165
+  [random_projection K=128] ep 10/30 train=0.03256 val_mse=0.001101
+  [random_projection K=128] ep 15/30 train=0.03240 val_mse=0.001072
+  [random_projection K=128] ep 20/30 train=0.03229 val_mse=0.001051
+  [random_projection K=128] ep 25/30 train=0.03224 val_mse=0.001035
+  [random_projection K=128] ep 30/30 train=0.03218 val_mse=0.001022
+  [random_projection K=128] done in 231.1s  final val_mse=0.001022
+=== training dct_lowfreq K=8 (T/K=87.5x) ===
+  [dct_lowfreq K=8] ep 1/30 train=0.12336 val_mse=0.010043
+  [dct_lowfreq K=8] ep 5/30 train=0.08796 val_mse=0.009452
+  [dct_lowfreq K=8] ep 10/30 train=0.08085 val_mse=0.009066
+  [dct_lowfreq K=8] ep 15/30 train=0.07875 val_mse=0.008922
+  [dct_lowfreq K=8] ep 20/30 train=0.07783 val_mse=0.008830
+  [dct_lowfreq K=8] ep 25/30 train=0.07481 val_mse=0.008969
+  [dct_lowfreq K=8] ep 30/30 train=0.07407 val_mse=0.008805
+  [dct_lowfreq K=8] done in 232.9s  final val_mse=0.008805
+=== training dct_lowfreq K=16 (T/K=43.8x) ===
+  [dct_lowfreq K=16] ep 1/30 train=0.09296 val_mse=0.005919
+  [dct_lowfreq K=16] ep 5/30 train=0.06055 val_mse=0.005590
+  [dct_lowfreq K=16] ep 10/30 train=0.05605 val_mse=0.005340
+  [dct_lowfreq K=16] ep 15/30 train=0.05320 val_mse=0.005199
+  [dct_lowfreq K=16] ep 20/30 train=0.04996 val_mse=0.005231
+  [dct_lowfreq K=16] ep 25/30 train=0.04906 val_mse=0.005477
+  [dct_lowfreq K=16] ep 30/30 train=0.04588 val_mse=0.004953
+  [dct_lowfreq K=16] done in 231.0s  final val_mse=0.004953
+=== training dct_lowfreq K=32 (T/K=21.9x) ===
+  [dct_lowfreq K=32] ep 1/30 train=0.08420 val_mse=0.003971
+  [dct_lowfreq K=32] ep 5/30 train=0.05929 val_mse=0.003179
+  [dct_lowfreq K=32] ep 10/30 train=0.05371 val_mse=0.002938
+  [dct_lowfreq K=32] ep 15/30 train=0.04582 val_mse=0.002713
+  [dct_lowfreq K=32] ep 20/30 train=0.04466 val_mse=0.002543
+  [dct_lowfreq K=32] ep 25/30 train=0.04034 val_mse=0.002549
+  [dct_lowfreq K=32] ep 30/30 train=0.04002 val_mse=0.002526
+  [dct_lowfreq K=32] done in 232.5s  final val_mse=0.002526
+=== training dct_lowfreq K=64 (T/K=10.9x) ===
+  [dct_lowfreq K=64] ep 1/30 train=0.05744 val_mse=0.002088
+  [dct_lowfreq K=64] ep 5/30 train=0.03805 val_mse=0.001565
+  [dct_lowfreq K=64] ep 10/30 train=0.03726 val_mse=0.001497
+  [dct_lowfreq K=64] ep 15/30 train=0.03693 val_mse=0.001470
+  [dct_lowfreq K=64] ep 20/30 train=0.03419 val_mse=0.001461
+  [dct_lowfreq K=64] ep 25/30 train=0.03405 val_mse=0.001450
+  [dct_lowfreq K=64] ep 30/30 train=0.03320 val_mse=0.001219
+  [dct_lowfreq K=64] done in 233.8s  final val_mse=0.001219
+=== training dct_lowfreq K=128 (T/K=5.5x) ===
+  [dct_lowfreq K=128] ep 1/30 train=0.04772 val_mse=0.002495
+  [dct_lowfreq K=128] ep 5/30 train=0.03050 val_mse=0.002359
+  [dct_lowfreq K=128] ep 10/30 train=0.02982 val_mse=0.002092
+  [dct_lowfreq K=128] ep 15/30 train=0.02918 val_mse=0.001943
+  [dct_lowfreq K=128] ep 20/30 train=0.02770 val_mse=0.001930
+  [dct_lowfreq K=128] ep 25/30 train=0.02739 val_mse=0.001923
+  [dct_lowfreq K=128] ep 30/30 train=0.02563 val_mse=0.001837
+  [dct_lowfreq K=128] done in 235.5s  final val_mse=0.001837
+=== training learnable_linear K=8 (T/K=87.5x) ===
+  [learnable_linear K=8] ep 1/30 train=0.08813 val_mse=0.003686
+  [learnable_linear K=8] ep 5/30 train=0.05116 val_mse=0.003040
+  [learnable_linear K=8] ep 10/30 train=0.04811 val_mse=0.002998
+  [learnable_linear K=8] ep 15/30 train=0.04644 val_mse=0.002846
+  [learnable_linear K=8] ep 20/30 train=0.04416 val_mse=0.002821
+  [learnable_linear K=8] ep 25/30 train=0.04384 val_mse=0.002733
+  [learnable_linear K=8] ep 30/30 train=0.04317 val_mse=0.002727
+  [learnable_linear K=8] done in 245.1s  final val_mse=0.002727
+=== training learnable_linear K=16 (T/K=43.8x) ===
+  [learnable_linear K=16] ep 1/30 train=0.06167 val_mse=0.002148
+  [learnable_linear K=16] ep 5/30 train=0.03681 val_mse=0.001686
+  [learnable_linear K=16] ep 10/30 train=0.03581 val_mse=0.001604
+  [learnable_linear K=16] ep 15/30 train=0.03552 val_mse=0.001581
+  [learnable_linear K=16] ep 20/30 train=0.03365 val_mse=0.001456
+  [learnable_linear K=16] ep 25/30 train=0.03352 val_mse=0.001449
+  [learnable_linear K=16] ep 30/30 train=0.03318 val_mse=0.001435
+  [learnable_linear K=16] done in 242.2s  final val_mse=0.001435
+=== training learnable_linear K=32 (T/K=21.9x) ===
+  [learnable_linear K=32] ep 1/30 train=0.06436 val_mse=0.001697
+  [learnable_linear K=32] ep 5/30 train=0.04569 val_mse=0.001381
+  [learnable_linear K=32] ep 10/30 train=0.04298 val_mse=0.001168
+  [learnable_linear K=32] ep 15/30 train=0.04169 val_mse=0.001094
+  [learnable_linear K=32] ep 20/30 train=0.04020 val_mse=0.001048
+  [learnable_linear K=32] ep 25/30 train=0.03939 val_mse=0.001034
+  [learnable_linear K=32] ep 30/30 train=0.03933 val_mse=0.001023
+  [learnable_linear K=32] done in 240.9s  final val_mse=0.001023
+=== training learnable_linear K=64 (T/K=10.9x) ===
+  [learnable_linear K=64] ep 1/30 train=0.04891 val_mse=0.002144
+  [learnable_linear K=64] ep 5/30 train=0.02771 val_mse=0.001735
+  [learnable_linear K=64] ep 10/30 train=0.02637 val_mse=0.001680
+  [learnable_linear K=64] ep 15/30 train=0.02616 val_mse=0.001649
+  [learnable_linear K=64] ep 20/30 train=0.02606 val_mse=0.001635
+  [learnable_linear K=64] ep 25/30 train=0.02600 val_mse=0.001623
+  [learnable_linear K=64] ep 30/30 train=0.02596 val_mse=0.001616
+  [learnable_linear K=64] done in 241.4s  final val_mse=0.001616
+=== training learnable_linear K=128 (T/K=5.5x) ===
+  [learnable_linear K=128] ep 1/30 train=0.04996 val_mse=0.001680
+  [learnable_linear K=128] ep 5/30 train=0.03009 val_mse=0.001328
+  [learnable_linear K=128] ep 10/30 train=0.02961 val_mse=0.001262
+  [learnable_linear K=128] ep 15/30 train=0.02943 val_mse=0.001229
+  [learnable_linear K=128] ep 20/30 train=0.02935 val_mse=0.001205
+  [learnable_linear K=128] ep 25/30 train=0.02930 val_mse=0.001194
+  [learnable_linear K=128] ep 30/30 train=0.02927 val_mse=0.001189
+  [learnable_linear K=128] done in 238.3s  final val_mse=0.001189
+All training done. Checkpoints under runs/real_A/

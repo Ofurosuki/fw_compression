@@ -1,0 +1,41 @@
+{
+  "run_name": "real_A",
+  "data": "real",
+  "cv": "A",
+  "encoders": [
+    "coarse_binning",
+    "random_projection",
+    "dct_lowfreq",
+    "learnable_linear"
+  ],
+  "ks": [
+    8,
+    16,
+    32,
+    64,
+    128
+  ],
+  "T": 700,
+  "n_train": 20000,
+  "n_val": 2000,
+  "epochs": 30,
+  "batch_size": 256,
+  "lr": 0.001,
+  "energy_weight": 0.0,
+  "peak_weight": 1.0,
+  "seed": 42,
+  "device": "cuda:0",
+  "smoke": false,
+  "waveform_cfg": {
+    "T": 700,
+    "data_root": "ghost_datasets",
+    "annotation_subdir": "annotation_v1_expand",
+    "frames_per_scene": 30,
+    "pixels_per_frame": 2500,
+    "ghost_fraction": 0.5,
+    "measure_half_window": 25,
+    "merge_gap": 12,
+    "min_rel_height": 0.05,
+    "cache_dir": "runs/real_cache"
+  }
+}

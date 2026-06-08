@@ -1,0 +1,25 @@
+  [real] extracting scene002: 30 frames x ~2500 px ...
+    frame 5/30  cumulative N=12500
+    frame 10/30  cumulative N=25000
+    frame 15/30  cumulative N=37500
+    frame 20/30  cumulative N=50000
+    frame 25/30  cumulative N=62500
+    frame 30/30  cumulative N=75000
+  [real] scene002: N=75000 (37500 ghost) -> cached runs/real_cache/scene002_09d117fe8f.npz
+  [real] extracting scene002: 30 frames x ~2500 px ...
+    frame 5/30  cumulative N=12500
+    frame 10/30  cumulative N=25000
+    frame 15/30  cumulative N=37500
+    frame 20/30  cumulative N=50000
+    frame 25/30  cumulative N=62500
+    frame 30/30  cumulative N=75000
+  [real] scene002: N=75000 (37500 ghost) -> cached runs/real_cache/scene002_4786afbaff.npz
+  [real] extracting scene001: 30 frames x ~2500 px ...
+    frame 5/30  cumulative N=12500
+    frame 10/30  cumulative N=25000
+    frame 15/30  cumulative N=37500
+    frame 20/30  cumulative N=50000
+    frame 25/30  cumulative N=62500
+    frame 30/30  cumulative N=75000
+  [real] scene001: N=75000 (37500 ghost) -> cached runs/real_cache/scene001_60d75b18ec.npz
+REMAINING CACHES BUILT

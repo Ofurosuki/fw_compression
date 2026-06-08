@@ -1,0 +1,25 @@
+  [spatial] extracting scene002: 30 frames x ~200 patches ...
+    frame 5/30  cumulative patches=1000
+    frame 10/30  cumulative patches=2000
+    frame 15/30  cumulative patches=3000
+    frame 20/30  cumulative patches=4000
+    frame 25/30  cumulative patches=5000
+    frame 30/30  cumulative patches=6000
+  [spatial] scene002: N=6000 patches (4200 ghost-bearing) -> cached runs/real_cache_spatial/scene002_b4_0efa9d61da.npz
+  [spatial] extracting scene002: 30 frames x ~200 patches ...
+    frame 5/30  cumulative patches=1000
+    frame 10/30  cumulative patches=2000
+    frame 15/30  cumulative patches=3000
+    frame 20/30  cumulative patches=4000
+    frame 25/30  cumulative patches=5000
+    frame 30/30  cumulative patches=6000
+  [spatial] scene002: N=6000 patches (4200 ghost-bearing) -> cached runs/real_cache_spatial/scene002_b4_5ba41a28c5.npz
+  [spatial] extracting scene001: 30 frames x ~200 patches ...
+    frame 5/30  cumulative patches=1000
+    frame 10/30  cumulative patches=2000
+    frame 15/30  cumulative patches=3000
+    frame 20/30  cumulative patches=4000
+    frame 25/30  cumulative patches=5000
+    frame 30/30  cumulative patches=6000
+  [spatial] scene001: N=6000 patches (4200 ghost-bearing) -> cached runs/real_cache_spatial/scene001_b4_d26a3fae40.npz
+SPATIAL CACHES BUILT

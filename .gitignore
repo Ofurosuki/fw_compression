@@ -1,0 +1,5 @@
+Ghost-FWL/**
+ghost_datasets/**
+.venv/**
+__pycache__/**
+*.pt

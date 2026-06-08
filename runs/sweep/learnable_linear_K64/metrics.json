@@ -1,0 +1,22 @@
+{
+  "waveform_mse_mean": 0.00159649015404284,
+  "waveform_mse_std": 0.0008163490565493703,
+  "energy_abs_mean": 8.521446228027344,
+  "energy_rel_mean": 0.3072183132171631,
+  "peak_loc_error_mean": 1.4931545845328078,
+  "peak_loc_error_median": 0.922607421875,
+  "peak_count_mae": 0.45475,
+  "peak_count_acc": 0.6945,
+  "peak_recall": 0.960886930174907,
+  "peak_precision": 0.8008494031221304,
+  "ghost_recall": 0.9129101502606563,
+  "compression_ratio": 10.9375,
+  "T": 700,
+  "K": 64,
+  "ghost_proxy_precision": 0.8630927835051546,
+  "ghost_proxy_recall": 0.9614147909967846,
+  "ghost_proxy_f1": 0.9096045197740112,
+  "ghost_proxy_f1_upperbound": 0.9899726526891522,
+  "ghost_proxy_f1_retention": 0.9188178252229192,
+  "encoder": "learnable_linear"
+}

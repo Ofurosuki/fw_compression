@@ -1,0 +1,39 @@
+[project]
+name = "fw-compression"
+version = "0.1.0"
+description = "Lightweight encoder + DNN decoder compression for full-waveform LiDAR, evaluated against Ghost-FWL downstream."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "torch>=2.4.1",
+  "numpy>=1.24",
+  "scipy>=1.10",
+  "matplotlib>=3.7",
+  "tqdm>=4.66",
+  "blosc2>=4.4.2",
+]
+
+[dependency-groups]
+dev = [
+  "ruff>=0.11.8",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["compression"]
+
+[tool.uv]
+environments = ["sys_platform == 'linux'"]
+
+[tool.uv.sources]
+torch = [
+  {index = "pytorch-cu121", marker = "sys_platform == 'linux'"},
+]
+
+[[tool.uv.index]]
+name = "pytorch-cu121"
+url = "https://download.pytorch.org/whl/cu121"
+explicit = true

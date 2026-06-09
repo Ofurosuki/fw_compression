@@ -33,8 +33,8 @@ full waveform x [B,T]
 | `compression/data/synthetic_waveforms.py` | synthetic multi-peak + ghost waveform generator (T=700, matches Ghost-FWL voxel depth); swap-in point for real data |
 | `compression/encoders.py` | `coarse_binning`, `random_projection`, `dct_lowfreq`, `learnable_linear` |
 | `compression/decoders.py` | `MLPDecoder` (+ `DeepMLPDecoder`) |
-| `compression/autoencoder.py` | encoder→latent→decoder + `reconstruction_loss` (MSE + optional energy + peak-aware) |
-| `compression/utils/metrics.py` | waveform MSE, peak localization error, peak-count preservation, energy error, ghost recall, compression ratio |
+| `compression/autoencoder.py` | encoder→latent→decoder + `reconstruction_loss` (MSE + optional energy + peak-aware + anti-hallucination bg/false-peak terms) |
+| `compression/utils/metrics.py` | waveform MSE, peak localization error, peak-count preservation, energy error, ghost recall, **spurious (nonexistent) peak metrics**, compression ratio |
 | `compression/utils/plot.py` | original-vs-reconstructed plots, metric-vs-K sweep plots |
 | `compression/downstream/ghost_fwl_hook.py` | stable interface to Ghost-FWL downstream (deferred) + `proxy_ghost_score` |
 | `train_autoencoder.py` | trains the encoder × K sweep, saves checkpoints |
@@ -229,6 +229,54 @@ worth it precisely when train/test ghost brightness differ. Outputs:
 `runs/real_{A,B}_spatial/{summary.json, sweep_survival.png, sweep_freq.png, sweep.png}`.
 Caveats: still only 2 scenes; spatial gain may grow with larger/varied blocks, amplitude-
 preserving (per-patch) normalization, or a conv decoder — none explored yet.
+
+## Spurious-peak (false-positive) suppression (fifth iteration)
+
+The reconstructions recover true peaks but also **hallucinate spurious peaks** in
+regions that were baseline in the original. These nonexistent peaks create false
+detections downstream (e.g. a fake ghost where none exists), so this iteration
+adds both a **loss countermeasure** and a **dedicated evaluation metric** for them.
+(Branch `feature/remove_falsepositive`.)
+
+**Root cause:** the old loss (MSE + peak-region-weighted MSE) only *emphasised*
+true-peak bins; nothing penalised activity in the background/off-peak region, where
+a small fake bump costs almost nothing under MSE. Under aggressive compression the
+decoder fills that region with ringing/smear that the peak detector reads as real.
+
+**Loss redesign** (`compression/autoencoder.py reconstruction_loss`, OFF by default
+like `energy_weight`, wired through `train_autoencoder.py`):
+
+- `--bg_weight` — **background over-shoot suppression**: penalises `relu(x_hat − x)²`
+  on non-peak bins. Asymmetric on purpose — it kills signal reconstructed *above* the
+  truth (where fakes live) but does **not** force a genuine non-zero baseline / EMG
+  tail to zero (those are part of `x`, so they incur no penalty). This is the workhorse.
+- `--fp_weight` — **differentiable false-peak penalty**: `relu(slope_left)·relu(slope_right)`
+  is > 0 only at a local maximum and grows with its prominence; restricted to background
+  bins it directly punishes spurious peaks without touching true ones. Sharp supplement
+  (scales ~prominence², so it needs a larger weight to bite).
+- `build_bg_mask(labels, T, protect=20)` = `1 − dilated(peak_mask)`; `--protect_width`
+  is wider than the peak-loss `width=8` so a true peak's shoulders/tail aren't penalised.
+
+```bash
+# recommended starting point (tune so the bg term ≈ MSE at convergence)
+uv run python train_autoencoder.py --run_name real_A_nofp --data real --cv A \
+    --bg_weight 5.0 --fp_weight 0.5 --epochs 30 --device cuda:0
+uv run python evaluate_autoencoder.py --run_name real_A_nofp --data real --cv A --device cuda:0
+```
+
+**New metric** (`false_peak_metrics` in `compression/utils/metrics.py`, auto-flows via
+`aggregate_metrics` → reported on every eval path incl. spatial). A peak detected on
+`x_hat` with **no** reference peak within `tol` bins is *spurious*:
+
+| metric | meaning |
+|---|---|
+| `spurious_per_wave` | mean # spurious peaks per waveform (headline count) |
+| `spurious_rate` | spurious / all detected peaks (`= 1 − peak_precision`) |
+| `spurious_wave_frac` | fraction of waveforms with ≥1 spurious peak |
+| `spurious_prom_ratio` | **severity-weighted**: spurious prominence / reference prominence (a tall fake counts more than a ripple) |
+| `false_ghost_rate` | fraction of non-ghost waveforms that gain a hallucinated extra return — the **downstream-relevant false positive** |
+
+Surfaced per config in the eval log as `SPUR/w= prom= fghost=`.
 
 ## Notes / calibration findings
 

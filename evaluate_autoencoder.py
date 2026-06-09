@@ -155,20 +155,24 @@ def main():
         plot_examples(x[sel], x_hat[sel], os.path.join(out, "examples.png"),
                       labels=[lab[i] for i in sel], n=len(sel), title=f"{enc} K={K} (CR={args.T/K:.0f}x)")
         results.append(m)
+        spur = (
+            f"SPUR/w={m['spurious_per_wave']:.2f} prom={m['spurious_prom_ratio']:.2f} "
+            f"fghost={m['false_ghost_rate']:.2f}"
+        )
         if args.data == "physical":
             print(
                 f"[{enc:17s} K={K:3d}] CR={args.T/K:5.1f}x mse={m['waveform_mse_mean']:.2e} | "
                 f"NARROW int={m['narrow_intensity_relerr']:.2f} fwhm={m['narrow_fwhm_relerr']:.2f} rec={m['narrow_recall']:.2f} | "
-                f"WIDE int={m['wide_intensity_relerr']:.2f} fwhm={m['wide_fwhm_relerr']:.2f} rec={m['wide_recall']:.2f}"
+                f"WIDE int={m['wide_intensity_relerr']:.2f} fwhm={m['wide_fwhm_relerr']:.2f} rec={m['wide_recall']:.2f} | {spur}"
             )
         elif args.data == "real":
             print(
                 f"[{enc:17s} K={K:3d}] CR={args.T/K:5.1f}x mse={m['waveform_mse_mean']:.2e} | "
                 f"survival obj={m['object_recall']:.2f} glass={m['glass_recall']:.2f} GHOST={m['ghost_recall']:.2f} | "
-                f"ghost-fidelity int={m['all_intensity_relerr']:.2f} fwhm={m['all_fwhm_relerr']:.2f}"
+                f"ghost-fidelity int={m['all_intensity_relerr']:.2f} fwhm={m['all_fwhm_relerr']:.2f} | {spur}"
             )
         else:
-            print(f"[{enc} K={K}] mse={m['waveform_mse_mean']:.2e} ghost_f1={m['ghost_proxy_f1']:.3f}")
+            print(f"[{enc} K={K}] mse={m['waveform_mse_mean']:.2e} ghost_f1={m['ghost_proxy_f1']:.3f} | {spur}")
 
     with open(os.path.join(run_dir, "summary.json"), "w") as f:
         json.dump(results, f, indent=2)

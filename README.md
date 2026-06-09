@@ -68,13 +68,42 @@ a background floor, and Poisson (shot) + read noise. Ground-truth peak labels
 yields the same `(wave[T], label_dict)` contract (extract per-pixel waveforms
 from the `(400, 512, 700)` voxel grids; peak labels from the `*_peak.npy` files).
 
-## Downstream evaluation
+## Downstream evaluation (implemented)
 
-The real Ghost-FWL pipeline (3D voxel + Transformer-MAE) needs the dataset and
-trained checkpoints, which are not available locally, so it is **deferred** via a
-stable interface (`GhostFWLEvaluator`). In the meantime `proxy_ghost_score`
-measures whether ghost returns survive compression (precision/recall/F1 of
-ghost-return detection on reconstructions vs. the full-waveform upper bound).
+The real downstream is now wired up end-to-end (`downstream/`). The frozen,
+pre-trained Ghost-FWL segmentation model **FWL-ToPM** (`vit3d_ordered_pruning_light`
+from the evolved repo, paper *"Towards Real-Time FWL Transformers…"*) is used as a
+fixed evaluator: compression quality is the **downstream F1-mean over
+object/glass/ghost** (Noise excluded) on the split2 test scenes.
+
+`downstream/run_eval.py` drives the (read-only) Ghost-FWL repo via `PYTHONPATH`,
+loads the frozen model, and optionally inserts a **compress → reconstruct**
+transform on the raw `T=700` per-pixel waveforms (per-pixel max-normalize → AE →
+de-normalize) *before* the model's own crop pipeline, then reports
+confusion-matrix F1 (the repo's slow per-pixel peak detection is skipped). It also
+emits a fixed 6-waveform orig-vs-recon figure per config. `run_sweep.py` fans the
+sweep over GPUs; `run_plot.py` aggregates to a table + F1-vs-ratio curve.
+
+```bash
+# baseline (no compression) and one compressed config:
+PYTHONPATH=<ghost-fwl-repo>/src uv run python downstream/run_eval.py \
+    --config downstream/configs/evalA_split2_test.yaml --compress none
+PYTHONPATH=... uv run python downstream/run_eval.py \
+    --config downstream/configs/evalA_split2_test.yaml \
+    --compress ae --ae_ckpt runs/real_split2_spatial/spatial_K512/checkpoint.pt \
+    --viz_out downstream/outputs/sp_K512.png
+uv run python downstream/run_sweep.py && uv run python downstream/run_plot.py
+```
+
+**Results** (FWL-ToPM, split2 test; see `downstream/outputs/sweep/`): no-compression
+baseline **F1-mean 0.66**. The **spatial 4×4** autoencoder is the most robust —
+~0.56–0.58 from 6× to 88× — while the per-pixel 1D learnable encoder is intermediate
+and naive coarse-binning collapses at high ratio (glass class effectively lost). See
+`downstream/outputs/sweep/f1_vs_ratio.png` and the per-config waveform overlays.
+
+The earlier `proxy_ghost_score` / `GhostFWLEvaluator` stub remains for quick
+self-contained checks, but the headline downstream number now comes from the real
+frozen FWL-ToPM model above.
 
 ## Physical-data experiment & per-peak findings
 
@@ -134,8 +163,13 @@ running): no GT peak params and unknown IRF, so the EMG-fit `intensity/fwhm_rele
 `measure_peak`: height/area/FWHM); narrow/wide is split by the **measured** width on
 the original (not GT FWHM); and the headline metric becomes **per-class peak survival
 recall** (`object/glass/ghost`) against the real semantic labels — `ghost_recall`
-being the real transport signal that replaces the synthetic `proxy_ghost_score`. The
-real Ghost-FWL 3D segmentation downstream stays deferred (no checkpoints on disk).
+being the real transport signal that replaces the synthetic `proxy_ghost_score`.
+
+The AEs are now retrained on **all scenes** via the `SPLIT2` multi-scene split
+(7 train / 3 held-out test, aligned with the downstream repo) — `--split split2` on
+both train scripts — instead of the old 2-scene cross-validation, and the real
+Ghost-FWL 3D segmentation downstream is now **implemented** (see *Downstream
+evaluation* above), no longer deferred.
 
 Each scene → 75,000 waveforms (30 frames × 2,500 labelled pixels, half ghost-bearing),
 cached under `runs/real_cache/`.

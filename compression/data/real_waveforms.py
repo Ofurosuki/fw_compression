@@ -205,6 +205,16 @@ CV_SPLITS = {
     "B": dict(train="scene002", val="scene001"),
 }
 
+# Multi-scene split aligned with the downstream Ghost-FWL repo (vit3d ..._split2):
+# 7 train scenes / 3 held-out test scenes. The AE is trained ONLY on the train
+# scenes; the test scenes are kept out entirely so the downstream F1 evaluation on
+# them is leak-free (the downstream vit3d was trained on the same 7 train scenes).
+SPLIT2 = {
+    "train": ["11build", "14build_2floor", "16build", "16buildA_large",
+              "16buildA_mid", "34build", "gym_build"],
+    "test":  ["14build_7floor", "22build", "36build"],
+}
+
 
 def make_datasets_cv(cv: str, cfg: Optional[RealWaveformConfig] = None, seed: int = 42,
                      n_train: Optional[int] = None, n_val: Optional[int] = None):
@@ -217,4 +227,36 @@ def make_datasets_cv(cv: str, cfg: Optional[RealWaveformConfig] = None, seed: in
         tr_w, tr_l = tr_w[:n_train], tr_l[:n_train]
     if n_val:
         va_w, va_l = va_w[:n_val], va_l[:n_val]
+    return WaveformDataset(tr_w, tr_l), WaveformDataset(va_w, va_l), cfg
+
+
+def _extract_scenes(scenes: List[str], cfg: RealWaveformConfig, seed: int):
+    """Extract + concatenate per-pixel waveforms over several scenes."""
+    all_w, all_l = [], []
+    for i, sc in enumerate(scenes):
+        w, l = extract_scene(sc, cfg, seed=seed + i)
+        if len(w):
+            all_w.append(w)
+            all_l.extend(l)
+    waves = np.concatenate(all_w, axis=0) if all_w else np.zeros((0, cfg.T), np.float32)
+    return waves, all_l
+
+
+def make_datasets_multi(train_scenes: List[str], cfg: Optional[RealWaveformConfig] = None,
+                        seed: int = 42, n_train: Optional[int] = None, n_val: int = 5000):
+    """Pool several train scenes, shuffle, and carve a val split from the SAME pool.
+
+    Test scenes (see ``SPLIT2['test']``) are NOT passed here — they are reserved for
+    the leak-free downstream F1 evaluation."""
+    cfg = cfg or RealWaveformConfig()
+    waves, labels = _extract_scenes(train_scenes, cfg, seed)
+    rng = np.random.default_rng(seed)
+    perm = rng.permutation(len(waves))
+    waves = waves[perm]
+    labels = [labels[i] for i in perm]
+    n_val = min(n_val, len(waves) // 5)
+    va_w, va_l = waves[:n_val], labels[:n_val]
+    tr_w, tr_l = waves[n_val:], labels[n_val:]
+    if n_train and n_train < len(tr_w):
+        tr_w, tr_l = tr_w[:n_train], tr_l[:n_train]
     return WaveformDataset(tr_w, tr_l), WaveformDataset(va_w, va_l), cfg

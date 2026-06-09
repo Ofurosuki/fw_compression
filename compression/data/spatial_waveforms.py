@@ -31,6 +31,7 @@ import numpy as np
 
 from compression.data.real_waveforms import (
     CV_SPLITS,
+    SPLIT2,
     LABEL_MAP,
     SIGNAL_CLASSES,
     _annotation_path,
@@ -197,3 +198,24 @@ def make_datasets_spatial_cv(cv: str, cfg: Optional[SpatialWaveformConfig] = Non
     tr_p, tr_l = extract_scene_spatial(split["train"], cfg, seed=seed)
     va_p, va_l = extract_scene_spatial(split["val"], cfg, seed=seed + 1)
     return SpatialPatchDataset(tr_p, tr_l), SpatialPatchDataset(va_p, va_l), cfg
+
+
+def make_datasets_spatial_multi(train_scenes, cfg: Optional[SpatialWaveformConfig] = None,
+                                seed: int = 42, n_val: int = 5000):
+    """Pool several train scenes of 4x4 patches, shuffle, carve a val split from the
+    SAME pool. Test scenes (SPLIT2['test']) are held out for the downstream eval."""
+    cfg = cfg or SpatialWaveformConfig()
+    all_p, all_l = [], []
+    for i, sc in enumerate(train_scenes):
+        p, l = extract_scene_spatial(sc, cfg, seed=seed + i)
+        if len(p):
+            all_p.append(p)
+            all_l.extend(l)
+    patches = np.concatenate(all_p, axis=0) if all_p else np.zeros((0,), np.float32)
+    rng = np.random.default_rng(seed)
+    perm = rng.permutation(len(patches))
+    patches = patches[perm]
+    labels = [all_l[i] for i in perm]
+    n_val = min(n_val, len(patches) // 5)
+    return (SpatialPatchDataset(patches[n_val:], labels[n_val:]),
+            SpatialPatchDataset(patches[:n_val], labels[:n_val]), cfg)

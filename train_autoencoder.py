@@ -137,6 +137,8 @@ def main():
     ap.add_argument("--data", choices=["physical", "synthetic", "real"], default="physical")
     ap.add_argument("--cv", choices=["A", "B"], default="A",
                     help="real-data cross-validation: A=train scene001/val scene002, B=swapped")
+    ap.add_argument("--split", default=None,
+                    help="real-data multi-scene split (e.g. 'split2', 7 train scenes); overrides --cv")
     ap.add_argument("--encoders", nargs="+", default=ALL_ENCODERS)
     ap.add_argument("--ks", nargs="+", type=int, default=ALL_KS)
     ap.add_argument("--T", type=int, default=700)
@@ -165,11 +167,19 @@ def main():
     np.random.seed(args.seed)
 
     if args.data == "real":
-        from compression.data.real_waveforms import RealWaveformConfig, make_datasets_cv
+        from compression.data.real_waveforms import (
+            RealWaveformConfig, make_datasets_cv, make_datasets_multi, SPLIT2,
+        )
         cfg = RealWaveformConfig(T=args.T)
         n_tr = None if args.n_train <= 0 else (args.n_train if args.n_train != 20000 else None)
-        train_ds, val_ds, cfg = make_datasets_cv(args.cv, cfg=cfg, seed=args.seed, n_train=n_tr, n_val=5000)
-        print(f"[real CV-{args.cv}] train={len(train_ds)} val={len(val_ds)} T={args.T}")
+        if args.split == "split2":
+            train_ds, val_ds, cfg = make_datasets_multi(
+                SPLIT2["train"], cfg=cfg, seed=args.seed, n_train=n_tr, n_val=5000)
+            print(f"[real split2] train={len(train_ds)} val={len(val_ds)} "
+                  f"({len(SPLIT2['train'])} scenes) T={args.T}")
+        else:
+            train_ds, val_ds, cfg = make_datasets_cv(args.cv, cfg=cfg, seed=args.seed, n_train=n_tr, n_val=5000)
+            print(f"[real CV-{args.cv}] train={len(train_ds)} val={len(val_ds)} T={args.T}")
     else:
         make_datasets, Cfg = get_data_api(args.data)
         cfg = Cfg(T=args.T)

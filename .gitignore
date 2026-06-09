@@ -1,5 +1,14 @@
 Ghost-FWL/**
 ghost_datasets/**
 .venv/**
-__pycache__/**
+__pycache__/
 *.pt
+# data caches (regenerable from the dataset)
+runs/**/*.npz
+runs/*cache*/
+# verbose run logs (keep the json/png results, drop the logs)
+*.log
+# local editor / Claude settings, large binaries
+.claude/
+*.pdf
+examples.png

@@ -24,8 +24,10 @@ from compression.spatial_coding import build_spatial_autoencoder
 from compression.data.spatial_waveforms import (
     SpatialWaveformConfig,
     make_datasets_spatial_cv,
+    make_datasets_spatial_multi,
     collate_patches,
 )
+from compression.data.real_waveforms import SPLIT2
 
 # block latent sizes matching per-pixel ratios T/{8,16,32,64,128} for a 4x4 (P=16) block
 ALL_KS = [128, 256, 512, 1024, 2048]
@@ -103,6 +105,8 @@ def train_one(K, train_ds, val_ds, T, P, device, epochs, batch_size, lr, peak_we
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--cv", choices=["A", "B"], default="A")
+    ap.add_argument("--split", default=None,
+                    help="real-data multi-scene split (e.g. 'split2', 7 train scenes); overrides --cv")
     ap.add_argument("--run_name", default="real_A_spatial")
     ap.add_argument("--ks", nargs="+", type=int, default=ALL_KS)
     ap.add_argument("--block", type=int, default=4)
@@ -120,8 +124,13 @@ def main():
     P = args.block * args.block
 
     cfg = SpatialWaveformConfig(T=args.T, block=args.block)
-    train_ds, val_ds, cfg = make_datasets_spatial_cv(args.cv, cfg=cfg, seed=args.seed)
-    print(f"[spatial CV-{args.cv}] train={len(train_ds)} val={len(val_ds)} patches P={P} T={args.T}")
+    if args.split == "split2":
+        train_ds, val_ds, cfg = make_datasets_spatial_multi(SPLIT2["train"], cfg=cfg, seed=args.seed)
+        print(f"[spatial split2] train={len(train_ds)} val={len(val_ds)} "
+              f"({len(SPLIT2['train'])} scenes) patches P={P} T={args.T}")
+    else:
+        train_ds, val_ds, cfg = make_datasets_spatial_cv(args.cv, cfg=cfg, seed=args.seed)
+        print(f"[spatial CV-{args.cv}] train={len(train_ds)} val={len(val_ds)} patches P={P} T={args.T}")
 
     run_dir = os.path.join("runs", args.run_name)
     os.makedirs(run_dir, exist_ok=True)

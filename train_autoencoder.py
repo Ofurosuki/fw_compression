@@ -51,6 +51,22 @@ def build_peak_mask(labels, T, width=8):
     return mask
 
 
+def build_bg_mask(labels, T, protect=20):
+    """Build a [B, T] background mask = 1 on non-peak bins, 0 within ``±protect``
+    of any labelled peak (for the anti-hallucination loss terms).
+
+    ``protect`` is wider than the peak-loss ``width`` so a true peak's natural
+    shoulders / tail are not mistaken for background and penalised.
+    """
+    B = len(labels)
+    mask = torch.ones(B, T)
+    for i, lab in enumerate(labels):
+        for p in np.asarray(lab["peak_positions"], dtype=int):
+            lo, hi = max(0, p - protect), min(T, p + protect + 1)
+            mask[i, lo:hi] = 0.0
+    return mask
+
+
 def train_one(
     encoder_name,
     K,
@@ -63,6 +79,9 @@ def train_one(
     lr=1e-3,
     energy_weight=0.0,
     peak_weight=1.0,
+    bg_weight=0.0,
+    fp_weight=0.0,
+    protect_width=20,
     out_dir=None,
     log_every=5,
 ):
@@ -85,9 +104,20 @@ def train_one(
         for x, labels in train_loader:
             x = x.to(device)
             peak_mask = build_peak_mask(labels, T).to(device) if peak_weight > 0 else None
+            bg_mask = (
+                build_bg_mask(labels, T, protect=protect_width).to(device)
+                if (bg_weight > 0 or fp_weight > 0)
+                else None
+            )
             x_hat, _ = model(x)
             loss, comps = reconstruction_loss(
-                x_hat, x, energy_weight=energy_weight, peak_weight=peak_weight, peak_mask=peak_mask
+                x_hat, x,
+                energy_weight=energy_weight,
+                peak_weight=peak_weight,
+                peak_mask=peak_mask,
+                bg_weight=bg_weight,
+                fp_weight=fp_weight,
+                bg_mask=bg_mask,
             )
             opt.zero_grad()
             loss.backward()
@@ -150,6 +180,16 @@ def main():
     # energy with a broad smear and never localizes peaks. Kept available for ablation.
     ap.add_argument("--energy_weight", type=float, default=0.0)
     ap.add_argument("--peak_weight", type=float, default=1.0)
+    # Anti-hallucination terms (suppress spurious / nonexistent peaks). OFF by
+    # default for reproducibility; recommended starting point: --bg_weight 5.0
+    # (background over-shoot suppression) optionally with --fp_weight 0.5 (sharp
+    # false-peak penalty). Tune so the bg term is comparable to MSE at convergence.
+    ap.add_argument("--bg_weight", type=float, default=0.0,
+                    help="weight on background over-shoot suppression relu(x_hat-x)^2")
+    ap.add_argument("--fp_weight", type=float, default=0.0,
+                    help="weight on the differentiable false-peak (local-max) penalty")
+    ap.add_argument("--protect_width", type=int, default=20,
+                    help="bins around each labelled peak excluded from background terms")
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--device", default="cuda:0" if torch.cuda.is_available() else "cpu")
     ap.add_argument("--smoke", action="store_true", help="tiny fast run for sanity checking")
@@ -197,6 +237,9 @@ def main():
                 lr=args.lr,
                 energy_weight=args.energy_weight,
                 peak_weight=args.peak_weight,
+                bg_weight=args.bg_weight,
+                fp_weight=args.fp_weight,
+                protect_width=args.protect_width,
                 out_dir=out_dir,
             )
     print(f"All training done. Checkpoints under {run_dir}/")

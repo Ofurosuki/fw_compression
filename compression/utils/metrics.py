@@ -52,6 +52,107 @@ def detect_peaks(
     return peaks
 
 
+def detect_peaks_with_prominence(
+    wave: np.ndarray,
+    smooth: float = 2.0,
+    prominence: float = 0.05,
+    distance: int = 20,
+    rel_height: float = 0.1,
+):
+    """Like :func:`detect_peaks` but also return each peak's prominence.
+
+    Prominence is the natural severity weight for a *spurious* peak: a tall fake
+    return misleads the downstream detector far more than a low ripple does.
+    Returns ``(positions, prominences)`` aligned by index.
+    """
+    s = gaussian_filter1d(wave, smooth) if smooth and smooth > 0 else wave
+    height = rel_height * float(s.max()) if rel_height > 0 else None
+    peaks, props = find_peaks(s, prominence=prominence, distance=distance, height=height)
+    proms = props.get("prominences", np.zeros(len(peaks), dtype=float))
+    return peaks, np.asarray(proms, dtype=float)
+
+
+def false_peak_metrics(
+    x: np.ndarray,
+    x_hat: np.ndarray,
+    labels: Optional[List[Dict]] = None,
+    tol: float = 10.0,
+    **detect_kwargs,
+) -> Dict[str, float]:
+    """Waveform-level *spurious* (nonexistent) peak metrics.
+
+    A peak detected on the reconstruction ``x_hat`` that matches **no** reference
+    peak within ``tol`` bins is *spurious* -- it did not exist in the original and
+    will create false detections downstream. This is the false-positive complement
+    of :func:`peak_metrics`' recall, but reported as headline numbers and weighted
+    by severity. Reference peaks come from ground-truth ``labels`` when available,
+    else from :func:`detect_peaks` on the clean original ``x``.
+
+    Returns:
+      - spurious_per_wave   : mean # spurious peaks per waveform (the headline count)
+      - spurious_rate       : spurious / all detected peaks  (== 1 - peak_precision)
+      - spurious_wave_frac  : fraction of waveforms with >=1 spurious peak
+      - spurious_prom_ratio : mean over waveforms of (sum spurious prominence /
+                              sum reference prominence) -- severity-weighted, so a
+                              tall hallucinated peak counts more than a ripple
+      - false_ghost_rate    : fraction of single-/non-ghost waveforms that gain a
+                              spurious extra return (the downstream-relevant case:
+                              hallucinating a ghost where none exists). NaN without labels.
+    """
+    N = x.shape[0]
+    spur_count: List[int] = []
+    spur_prom_ratio: List[float] = []
+    waves_with_spur = 0
+    total_pred = 0
+    total_spur = 0
+    nonghost_n = 0
+    false_ghost = 0
+
+    for i in range(N):
+        if labels is not None:
+            ref = np.asarray(labels[i]["peak_positions"], dtype=float)
+            is_ghost = bool(labels[i].get("ghost", False))
+        else:
+            ref = detect_peaks(x[i], **detect_kwargs).astype(float)
+            is_ghost = False
+
+        pred, proms = detect_peaks_with_prominence(x_hat[i], **detect_kwargs)
+        pred = pred.astype(float)
+        # self-consistent normaliser: prominence scale of the reference returns,
+        # measured the same way on the original waveform
+        _, ref_proms = detect_peaks_with_prominence(x[i], **detect_kwargs)
+        ref_prom_sum = float(ref_proms.sum())
+
+        # a predicted peak is spurious if no reference peak lies within tol bins
+        if len(ref) == 0:
+            spurious = list(range(len(pred)))
+        else:
+            spurious = [j for j, p in enumerate(pred) if np.min(np.abs(ref - p)) > tol]
+        ns = len(spurious)
+
+        spur_count.append(ns)
+        total_pred += len(pred)
+        total_spur += ns
+        if ns > 0:
+            waves_with_spur += 1
+        sp = float(proms[spurious].sum()) if ns else 0.0
+        spur_prom_ratio.append(sp / max(ref_prom_sum, 1e-8))
+
+        # false-ghost: a non-ghost waveform that gains a hallucinated extra return
+        if labels is not None and not is_ghost:
+            nonghost_n += 1
+            if ns >= 1:
+                false_ghost += 1
+
+    return {
+        "spurious_per_wave": float(np.mean(spur_count)) if spur_count else 0.0,
+        "spurious_rate": float(total_spur / max(total_pred, 1)),
+        "spurious_wave_frac": float(waves_with_spur / max(N, 1)),
+        "spurious_prom_ratio": float(np.mean(spur_prom_ratio)) if spur_prom_ratio else 0.0,
+        "false_ghost_rate": float(false_ghost / nonghost_n) if nonghost_n else float("nan"),
+    }
+
+
 def match_peaks(true_pos: np.ndarray, pred_pos: np.ndarray, tol: float = 10.0):
     """Greedy nearest-neighbour matching between true and predicted peak positions.
 
@@ -382,6 +483,7 @@ def aggregate_metrics(
         "energy_rel_mean": float(en["energy_rel"].mean()),
     }
     out.update(peak_metrics(x, x_hat, labels=labels, tol=tol, **detect_kwargs))
+    out.update(false_peak_metrics(x, x_hat, labels=labels, tol=tol, **detect_kwargs))
     if T is not None and K is not None:
         out["compression_ratio"] = float(T) / float(K)
         out["T"] = int(T)

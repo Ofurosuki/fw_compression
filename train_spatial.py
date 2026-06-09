@@ -47,17 +47,50 @@ def build_peak_mask_patch(labels, P, T, width=8):
     return mask
 
 
-def patch_loss(x_hat, x, peak_mask=None, peak_weight=1.0):
+def build_bg_mask_patch(labels, P, T, protect=20):
+    """[B, P, T] background mask = 1 on non-peak bins, 0 within ``±protect`` of any
+    labelled peak in each pixel (anti-hallucination terms). ``protect`` is wider than
+    the peak-loss ``width`` so a true peak's shoulders/tail are not penalised."""
+    B = len(labels)
+    mask = torch.ones(B, P, T)
+    for i, plist in enumerate(labels):
+        for p, lab in enumerate(plist):
+            if lab is None:
+                continue
+            for pos in np.asarray(lab["peak_positions"], dtype=int):
+                lo, hi = max(0, pos - protect), min(T, pos + protect + 1)
+                mask[i, p, lo:hi] = 0.0
+    return mask
+
+
+def patch_loss(x_hat, x, peak_mask=None, peak_weight=1.0,
+               bg_weight=0.0, fp_weight=0.0, bg_mask=None):
+    """MSE + optional peak-aware + anti-hallucination (bg over-shoot / false-peak)
+    terms, applied along the T axis of the [B, P, T] patch tensor (see the 1D
+    ``reconstruction_loss`` for the rationale)."""
     mse = torch.mean((x_hat - x) ** 2)
     total = mse
     if peak_weight > 0 and peak_mask is not None:
         denom = peak_mask.sum().clamp_min(1.0)
         peak_term = (((x_hat - x) ** 2) * peak_mask).sum() / denom
         total = total + peak_weight * peak_term
+    if bg_weight > 0 and bg_mask is not None:
+        denom = bg_mask.sum().clamp_min(1.0)
+        overshoot = torch.relu(x_hat - x)
+        bg_term = ((overshoot ** 2) * bg_mask).sum() / denom
+        total = total + bg_weight * bg_term
+    if fp_weight > 0 and bg_mask is not None:
+        dl = torch.relu(x_hat[:, :, 1:-1] - x_hat[:, :, :-2])
+        dr = torch.relu(x_hat[:, :, 1:-1] - x_hat[:, :, 2:])
+        peakness = dl * dr
+        m = bg_mask[:, :, 1:-1]
+        denom = m.sum().clamp_min(1.0)
+        total = total + fp_weight * (peakness * m).sum() / denom
     return total
 
 
-def train_one(K, train_ds, val_ds, T, P, device, epochs, batch_size, lr, peak_weight, out_dir, log_every=5):
+def train_one(K, train_ds, val_ds, T, P, device, epochs, batch_size, lr, peak_weight, out_dir,
+              bg_weight=0.0, fp_weight=0.0, protect_width=20, log_every=5):
     model = build_spatial_autoencoder(T=T, K=K, P=P).to(device)
     opt = torch.optim.Adam(model.parameters(), lr=lr)
     tl = DataLoader(train_ds, batch_size=batch_size, shuffle=True, collate_fn=collate_patches, num_workers=4, drop_last=True)
@@ -71,8 +104,11 @@ def train_one(K, train_ds, val_ds, T, P, device, epochs, batch_size, lr, peak_we
         for x, labels in tl:
             x = x.to(device)
             pm = build_peak_mask_patch(labels, P, T).to(device) if peak_weight > 0 else None
+            bm = (build_bg_mask_patch(labels, P, T, protect=protect_width).to(device)
+                  if (bg_weight > 0 or fp_weight > 0) else None)
             x_hat, _ = model(x)
-            loss = patch_loss(x_hat, x, peak_mask=pm, peak_weight=peak_weight)
+            loss = patch_loss(x_hat, x, peak_mask=pm, peak_weight=peak_weight,
+                              bg_weight=bg_weight, fp_weight=fp_weight, bg_mask=bm)
             opt.zero_grad()
             loss.backward()
             opt.step()
@@ -115,6 +151,12 @@ def main():
     ap.add_argument("--batch_size", type=int, default=256)
     ap.add_argument("--lr", type=float, default=1e-3)
     ap.add_argument("--peak_weight", type=float, default=1.0)
+    ap.add_argument("--bg_weight", type=float, default=0.0,
+                    help="weight on background over-shoot suppression relu(x_hat-x)^2")
+    ap.add_argument("--fp_weight", type=float, default=0.0,
+                    help="weight on the differentiable false-peak (local-max) penalty")
+    ap.add_argument("--protect_width", type=int, default=20,
+                    help="bins around each labelled peak excluded from background terms")
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--device", default="cuda:0" if torch.cuda.is_available() else "cpu")
     args = ap.parse_args()
@@ -142,7 +184,9 @@ def main():
         print(f"=== training spatial K={K} (P*T/K={ratio:.1f}x, per-pixel-equiv K={K//P}) ===")
         train_one(K, train_ds, val_ds, T=args.T, P=P, device=args.device,
                   epochs=args.epochs, batch_size=args.batch_size, lr=args.lr,
-                  peak_weight=args.peak_weight, out_dir=os.path.join(run_dir, f"spatial_K{K}"))
+                  peak_weight=args.peak_weight, bg_weight=args.bg_weight,
+                  fp_weight=args.fp_weight, protect_width=args.protect_width,
+                  out_dir=os.path.join(run_dir, f"spatial_K{K}"))
     print(f"All spatial training done. Checkpoints under {run_dir}/")
 
 

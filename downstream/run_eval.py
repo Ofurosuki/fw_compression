@@ -265,19 +265,26 @@ def main():
                         num_workers=nw, collate_fn=voxel_collate_fn, pin_memory=False)
     print(f"frames={len(ds)} batches={len(loader)} num_workers={nw}")
 
+    # Match the Ghost-FWL repo / paper convention: keep Noise in the confusion matrix
+    # (ignore_visualize_labels=[] in every repo config) and report F1-mean as the mean
+    # of the per-class F1 over the SIGNAL classes {object, glass, ghost} only. Noise is
+    # a competing class (its false positives DO penalise the signal classes); it is
+    # merely excluded from the average. (Masking Noise out of the CM inflates F1.)
     cm = evaluate(model, loader, device, config.num_classes,
                   config.ignore_visualize_labels, config.use_threshold_prediction,
                   config.prediction_threshold)
     met = calculate_metrics_from_confusion_matrix(cm, config.ignore_visualize_labels)
-    valid = [i for i in range(config.num_classes) if i not in config.ignore_visualize_labels]
+    SIGNAL = [1, 2, 3]  # object, glass, ghost
+    f1_mean = float(np.mean([met["f1"][i] for i in SIGNAL]))
 
     res = {
         "compress": args.compress, "ae_ckpt": args.ae_ckpt, "ae_meta": ae_meta,
-        "macro_f1": float(met["macro_f1"]),
-        "per_class_f1": {LABEL_MAP[i]: float(met["f1"][i]) for i in valid},
-        "per_class_precision": {LABEL_MAP[i]: float(met["precision"][i]) for i in valid},
-        "per_class_recall": {LABEL_MAP[i]: float(met["recall"][i]) for i in valid},
-        "macro_iou": float(met["macro_iou"]),
+        "macro_f1": f1_mean,                                   # F1-mean over object/glass/ghost (paper convention)
+        "macro_f1_4class": float(met["macro_f1"]),             # repo's raw macro over valid_classes
+        "ignore_visualize_labels": list(config.ignore_visualize_labels),
+        "per_class_f1": {LABEL_MAP[i]: float(met["f1"][i]) for i in SIGNAL},
+        "per_class_precision": {LABEL_MAP[i]: float(met["precision"][i]) for i in SIGNAL},
+        "per_class_recall": {LABEL_MAP[i]: float(met["recall"][i]) for i in SIGNAL},
         "confusion_matrix": cm.tolist(),
         "checkpoint": config.checkpoint_path,
     }

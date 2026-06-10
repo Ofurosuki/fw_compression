@@ -19,9 +19,17 @@ compressed-then-reconstructed waveforms and measuring its F1.
   it is a fixed downstream judge.
 
 ### Metric
-- **F1-mean = macro-F1 over {object, glass, ghost}, Noise excluded** (`ignore_visualize_labels: [0]`),
-  the same headline metric as the paper. Computed from the per-voxel confusion matrix
-  (argmax with softmax threshold 0.5).
+- **F1-mean = mean of the per-class F1 over {object, glass, ghost}**, computed from the
+  per-voxel confusion matrix (softmax + threshold-0.5 prediction), **exactly as the
+  Ghost-FWL repo / paper do**: `ignore_visualize_labels = []`, i.e. **Noise stays in the
+  confusion matrix as a competing class** (false positives onto/from Noise *do* penalise
+  the signal classes); Noise is only dropped from the *average*.
+  - ⚠️ *Convention matters by ~0.14.* An earlier version of this harness used
+    `ignore_visualize_labels = [0]`, which additionally **masks all true-Noise voxels out
+    of the confusion matrix** — that inflates F1 (background→ghost mistakes stop counting):
+    the no-compression baseline reads **0.66 masked vs 0.52 un-masked**. All numbers below
+    use the repo/paper convention (un-masked). The F1 *implementation* is the repo's own
+    `calculate_metrics_from_confusion_matrix` (verified: matches `run_test.py`).
 
 ### Test data
 - Ghost-FWL `split2` **test** scenes (held out from both the downstream model's and
@@ -65,14 +73,17 @@ Compression ratio = `T/K` (per-pixel-equivalent).
 
 ## 2. Baseline (no compression)
 
-FWL-ToPM on the **full** split2 test set, original waveforms:
+FWL-ToPM on the split2 test set (divide=3 sweep baseline), original waveforms
+(repo/paper convention):
 
 | metric | object | glass | ghost | **F1-mean** |
 |---|---|---|---|---|
-| F1 | 0.797 | 0.370 | 0.800 | **0.656** |
+| F1 | 0.694 | 0.298 | 0.558 | **0.517** |
 
-(`divide=3` subset gives 0.662, used as the reference line in the sweep plots.)
-Glass is intrinsically the hardest class (transparent, minority) — only 0.37 even
+For reference the paper reports F1-mean ≈ **0.592** for FWL-ToPM; our 0.517 on these 3
+split2 test scenes with the `aug-only-cutmix0.2_0.8` checkpoint sits a little below it
+(plausibly checkpoint/aug-variant and scene differences — same convention, same code).
+Glass is intrinsically the hardest class (transparent, minority) — only ~0.30 even
 uncompressed — and is the first to degrade under compression.
 
 ---
@@ -83,21 +94,24 @@ uncompressed — and is the first to degrade under compression.
 
 | ratio | spatial 4×4 | 1D learnable | 1D coarse (naive) |
 |---|---|---|---|
-| — (none) | **0.662** | | |
-| 6× | 0.583 | 0.544 | 0.569 |
-| 11× | 0.575 | **0.585** | 0.549 |
-| 22× | 0.581 | 0.550 | 0.530 |
-| 44× | 0.581 | 0.560 | — |
-| 88× | **0.560** | 0.509 | 0.441 |
+| — (none) | **0.517** | | |
+| 6× | **0.456** | 0.395 | 0.391 |
+| 11× | 0.452 | 0.411 | — |
+| 22× | 0.445 | 0.397 | 0.293 |
+| 44× | 0.448 | 0.378 | — |
+| 88× | 0.426 | 0.331 | 0.101 |
 
 **Findings**
-1. **spatial 4×4 is the most robust** — essentially flat (0.56–0.58) from 6× to 88×.
-   Sharing the 4×4 spatial neighbourhood lets it preserve peak shape even at extreme
-   compression. At 88× it keeps 85 % of baseline (0.560 / 0.662).
-2. **naive coarse-binning collapses at high ratio** — 0.441 at 88× (67 % of baseline),
-   with the glass class essentially lost (per-class F1 ≈ 0.02).
-3. **1D learnable is intermediate** and degrades at high ratio (0.509 at 88×).
-4. **glass is the bottleneck class** throughout; object/ghost are far better preserved.
+1. **spatial 4×4 is the most robust** — fairly flat (0.43–0.46) from 6× to 88×. Sharing
+   the 4×4 spatial neighbourhood preserves peak shape even at extreme compression; at 88×
+   it keeps ~82 % of baseline (0.426 / 0.517).
+2. **naive coarse-binning collapses at high ratio** — 0.101 at 88×, with glass essentially
+   lost (per-class F1 ≈ 0.006).
+3. **1D learnable is intermediate** and degrades at high ratio (0.331 at 88×).
+4. **glass is the bottleneck class** throughout (0.30 even uncompressed); object/ghost are
+   better preserved. The gap to no-compression (~0.06 at low ratio, up to ~0.19 at 88× for
+   1D) is larger than the masked convention suggested — because background→signal false
+   positives from compression artifacts now count.
 
 ---
 
@@ -116,26 +130,27 @@ re-evaluated downstream. `downstream/outputs/sweep_ah/` — `f1_compare.png`, `c
 
 | ratio | method | base F1 | **AH F1** | Δ |
 |---|---|---|---|---|
-| 88× | 1D learnable | 0.509 | **0.577** | **+0.067** |
-| 44× | 1D learnable | 0.560 | 0.575 | +0.015 |
-| 22× | 1D learnable | 0.550 | 0.568 | +0.018 |
-| 11× | 1D learnable | 0.585 | **0.629** | **+0.044** |
-| 6×  | 1D learnable | 0.544 | 0.554 | +0.009 |
-| 88× | spatial 4×4 | 0.560 | 0.588 | +0.028 |
-| 44× | spatial 4×4 | 0.581 | 0.593 | +0.012 |
-| 22× | spatial 4×4 | 0.581 | 0.601 | +0.020 |
-| 11× | spatial 4×4 | 0.575 | **0.618** | **+0.043** |
-| 6×  | spatial 4×4 | 0.583 | 0.596 | +0.013 |
+| 88× | 1D learnable | 0.331 | **0.398** | **+0.066** |
+| 44× | 1D learnable | 0.378 | 0.419 | +0.041 |
+| 22× | 1D learnable | 0.397 | 0.416 | +0.018 |
+| 11× | 1D learnable | 0.411 | **0.465** | **+0.054** |
+| 6×  | 1D learnable | 0.395 | 0.392 | −0.003 |
+| 88× | spatial 4×4 | 0.426 | 0.452 | +0.026 |
+| 44× | spatial 4×4 | 0.448 | 0.459 | +0.011 |
+| 22× | spatial 4×4 | 0.445 | 0.469 | +0.024 |
+| 11× | spatial 4×4 | 0.452 | **0.483** | **+0.031** |
+| 6×  | spatial 4×4 | 0.456 | 0.464 | +0.007 |
 
 **Findings**
-1. **Anti-hallucination loss improves downstream F1 for every config** (Δ +0.01…+0.07).
-2. **Largest gains at high compression** (1D 88×: +0.067) — where information is scarce,
-   hallucinated peaks do the most downstream damage, so suppressing them helps most.
-3. Both methods improve uniformly; the waveform figures show flatter reconstructed
-   backgrounds (fewer spurious bumps).
+1. **Anti-hallucination loss improves downstream F1 for nearly every config** (Δ +0.01…+0.07);
+   the only exception is 1D at the lowest ratio (6×, −0.003 — negligible, and where there is
+   little hallucination to fix).
+2. **Largest gains at high compression** (1D 88×: +0.066, 11×: +0.054) — where information is
+   scarce, hallucinated peaks do the most downstream damage, so suppressing them helps most.
+3. Both methods improve; the waveform figures show flatter reconstructed backgrounds.
 4. The AH models have *higher* reconstruction val-MSE than the base models yet *better*
-   downstream F1 — concrete evidence that **reconstruction MSE is not the right proxy**
-   for downstream quality, which is exactly why this frozen-model harness exists.
+   downstream F1 — concrete evidence that **reconstruction MSE is not the right proxy** for
+   downstream quality, which is exactly why this frozen-model harness exists.
 
 ---
 

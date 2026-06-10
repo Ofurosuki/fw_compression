@@ -13,7 +13,7 @@ CFG = "downstream/configs/evalA_split2_test.yaml"
 DIVIDE = "3"
 OUT = "downstream/outputs/sweep"
 VIZ = OUT + "/viz"
-GPUS = ["cuda:1", "cuda:2", "cuda:3"]
+GPUS = ["cuda:0", "cuda:1", "cuda:2", "cuda:3"]
 os.makedirs(VIZ, exist_ok=True)
 
 

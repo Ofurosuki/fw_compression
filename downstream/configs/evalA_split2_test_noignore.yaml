@@ -105,4 +105,4 @@ test_annotation_dirs:
 - /data3/user/ikeda/ghost_dataset/14build_7floor/annotation_v1_expand/hist010
 ignore_visualize_labels: []
 use_threshold_prediction: true
-output_dir: /home/yoshida/fw_compression/downstream/outputs/evalA_orig
+output_dir: downstream/outputs/evalA_noignore

@@ -250,10 +250,60 @@ Sweep K∈{1,2,3,4,6,8} × repr∈{t,ta,tw,taw} (divide=3). `downstream/outputs/
    more than intensity (`ta`), especially for **object** (0.58 vs 0.34 at K=2) — pulse
    *shape* is a strong transport cue. This distinguishes full-waveform LiDAR from ordinary
    multi-echo LiDAR: the (a,w) pulse parameters, not just multi-return geometry, carry the signal.
+
+   **Multi-echo-LiDAR analogue (K=4, full-res confirmed).** `ta` K=4 — up to 4 returns each
+   with range+intensity but *no pulse width/shape* — is exactly what a conventional
+   multi-echo LiDAR delivers. Adding width (`taw` K=4) **nearly doubles** the downstream F1:
+
+   | repr (K=4) | dim | object | glass | ghost | **F1-mean** (full-res / divide-3) |
+   |---|--:|--:|--:|--:|--:|
+   | `t`  (position only) | 4 | 0.120 | 0.145 | 0.267 | 0.177 |
+   | **`ta` (multi-echo: pos+intensity)** | 8 | 0.268 | 0.174 | 0.343 | **0.262** / 0.263 |
+   | `tw` (pos+width) | 8 | 0.368 | 0.192 | 0.341 | 0.300 |
+   | **`taw` (full-waveform: pos+int+width)** | 12 | 0.637 | 0.258 | 0.448 | **0.448** / 0.446 |
+   | full waveform | 700 | 0.694 | 0.298 | 0.558 | 0.517 |
+
+   The **+0.19** from `ta`→`taw` (driven mostly by **object**, 0.27→0.64) is the quantitative
+   value of full-waveform's pulse-shape information *over* a multi-echo sensor — almost as
+   large as the entire remaining gap to the uncompressed waveform. Notably `ta` (0.262) even
+   trails `tw` (0.300): for this downstream task **pulse width matters more than return
+   intensity**, so full-waveform LiDAR is not merely a higher-return-count multi-echo sensor
+   — it carries qualitatively different (shape) information.
 3. **`taw` plateaus from K≈2–3** (117×–78×) and barely improves out to K=8 (29×) — the
    first 2–3 events capture nearly all downstream-relevant structure. K=1 keeps **object**
    intact (0.696 ≈ full 0.694, the primary return) but **ghost collapses** (0.029): ghosts
    are *secondary* returns, so K≥2 is essential (ghost 0.029→0.400 from K=1→2).
+
+   **Why ghost is the bottleneck — diagnosed** (`diag_ghost.py`,
+   `downstream/outputs/events/diag/`). The ghost gap is a **recall** problem (precision
+   ~baseline): true ghost voxels get predicted as noise/object as K shrinks
+   (recall full=0.78 → K3=0.57 → K2=0.37 → K1=0.02). Two compounding causes:
+   - **(a) Ghosts are rarely the strongest return.** Over 383 k ghost pixels, the ghost
+     peak's height-rank is **median 2**: only 10 % are the strongest (rank 1), 90 % are
+     rank ≥2, 26 % rank ≥3. So top-K (which keeps the *tallest* peaks) drops the ghost
+     return at small K — ghost-peak recovery (event kept within ±3 bins) is **K1=9 %,
+     K2=72 %, K3=96 %, K≥4≈99 %**, mirroring the downstream recall curve.
+   - **(b) Even when the peak is kept, the clean Gaussian under-detects.** At K=3 the ghost
+     peak is recovered 96 % of the time, yet downstream ghost recall is only 0.57 — so a
+     retained ghost return synthesised as a clean symmetric Gaussian still loses the
+     shape/asymmetry/residual cues that distinguish a *ghost* secondary return from an
+     *object* return. This is the same dense-residual signal that motivates the
+     event-faithful / hybrid direction below (and explains the glass collapse).
+   - **Detected-vs-lost ghosts are indistinguishable by their own waveform**
+     (`diag_ghost_cases.py`, model predictions on matched voxels; orig recall 0.815 ≈ the
+     0.78 baseline, event recall 0.596 — sanity-checked). Among true ghosts the original
+     waveform *got right*, the ones the event rep then loses have the **same** ghost-return
+     height (median 0.25 vs 0.25) and the **same** waveform clutter (median 3 returns vs 3)
+     as the ones it keeps. So at K=3 the miss is *not* a per-pixel property (not dimmer,
+     not busier) — it is driven by the model's **3D spatial context** + fine pulse shape
+     that the clean-Gaussian synthesis discards uniformly. Misses split 59 % → noise,
+     41 % → object. Figures: `ghost_success_vs_fail.png` (example detected vs lost voxels,
+     orig-vs-synth model input), `ghost_lost_vs_amplitude.png` (the two refuted hypotheses).
+   - **The losses are spatially structured, not random** (`diag_ghost_spatial.py`,
+     `ghost_spatial_maps.png`): front-projecting ghost columns to (H,W) and comparing
+     GT / no-compression / event-K3 predictions, the dropped ghosts form **coherent
+     regions/bands** (column-level recall 0.88 → 0.71), not scattered voxels — the signature
+     of a perturbed 3D-context decision rather than independent per-pixel peak losses.
 4. **Glass is the stress class** (*Case D*): even `taw` tops out ~0.25 and never reaches the
    already-low full-waveform 0.30. Transparent-object cues are not captured by simple top-K
    peaks — they likely need subtle residuals/tails or spatial context. Glass should be a

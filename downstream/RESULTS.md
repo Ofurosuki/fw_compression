@@ -153,13 +153,36 @@ wider bottleneck can represent everything a narrower one can. Evidence so far:
 - `random_projection` has a **fixed (non-trained) encoder**, yet shows the same U — so
   the effect lives in **decoder optimisation**, not encoder training.
 
-Working hypothesis: an **optimisation/conditioning artifact of the shared fixed recipe**
+Hypothesis: an **optimisation/conditioning artifact of the shared fixed recipe**
 (lr=1e-3, 30 ep, no LR decay) — wider decoder fan-in is harder to condition, so the
-larger-K models settle at a higher plateau. A diagnostic (retrain K∈{32,64,128} with
-cosine LR + more epochs) is running to confirm; if K=64/128 then match/beat K=32 it is
-optimisation, not capacity. *(results: `downstream/outputs/diag_capacity.log` — to be
-appended.)* Note this MSE quirk does **not** carry over to downstream F1 (whose 1D peak
-is at 11×), reinforcing §4.4.
+larger-K models settle at a higher plateau.
+
+**Diagnostic** (`diag_capacity.py`): retrain K∈{32,64,128} with **cosine LR + 80 epochs**
+on the same data (120 k-waveform subset, so absolute values are higher than the full-data
+numbers above — only the *ordering within this table* is the valid comparison):
+
+| encoder | K=32 (22×) | K=64 (11×) | K=128 (5×) |
+|---|---|---|---|
+| learnable_linear  | 0.001760 | 0.001318 | **0.001192** |
+| random_projection | 0.001773 | **0.001490** | 0.001957 |
+
+vs. the original fixed-recipe shape (full data): learnable_linear 0.00094 / 0.00156 / 0.00184
+and random_projection 0.00104 / 0.00127 / 0.00150 — both **U-shaped (min at K=32)**.
+
+**Conclusion**
+- **learnable_linear: the U-shape is an optimisation artifact — confirmed.** With cosine
+  LR + more epochs the ordering flips to **monotonic in capacity (K=128 best)**, as it
+  should be (a wider bottleneck provably subsumes a narrower one). The original "22× is
+  best" was K=64/128 getting stuck at a worse plateau under the fixed lr/epoch recipe.
+- **random_projection: half artifact.** Better optimisation lets K=64 beat K=32 (so part
+  of the U *was* optimisation), but **K=128 stays worse** — a genuine effect of its
+  **fixed (non-trained) encoder**: extra random projections aren't adapted to the data, and
+  a fixed-capacity decoder cannot exploit them, so the inverse problem gets harder past
+  some K. The learned encoder adapts its projections, so it keeps improving to K=128.
+
+Takeaway: pick the AE bottleneck by **downstream F1 under a properly-tuned (LR-decayed)
+training recipe**, not by MSE under a fixed recipe — and note (per §4.4) downstream F1
+does not track MSE anyway.
 
 ---
 

@@ -1,0 +1,6 @@
+Top-K events vs AE baselines (F1-mean, split2 test, divide=3)
+
+full waveform (no compression):  0.517
+best event config: taw K=3 (dim=9, 78x)  ->  0.453
+best AE base: sp_K2048 (5x)  ->  0.456
+best AE anti-halluc: sp_K1024 (11x)  ->  0.483

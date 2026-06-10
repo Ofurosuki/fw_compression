@@ -1,0 +1,37 @@
+{
+  "cv": "A",
+  "split": "split2",
+  "run_name": "real_split2_spatial_ah",
+  "ks": [
+    128,
+    256,
+    512,
+    1024,
+    2048
+  ],
+  "block": 4,
+  "T": 700,
+  "epochs": 30,
+  "batch_size": 256,
+  "lr": 0.001,
+  "peak_weight": 1.0,
+  "bg_weight": 5.0,
+  "fp_weight": 0.5,
+  "protect_width": 20,
+  "seed": 42,
+  "device": "cuda:1",
+  "P": 16,
+  "spatial_cfg": {
+    "T": 700,
+    "data_root": "ghost_datasets",
+    "annotation_subdir": "annotation_v1_expand",
+    "block": 4,
+    "frames_per_scene": 30,
+    "patches_per_frame": 200,
+    "ghost_fraction": 0.7,
+    "measure_half_window": 25,
+    "merge_gap": 12,
+    "min_rel_height": 0.05,
+    "cache_dir": "runs/real_cache_spatial"
+  }
+}

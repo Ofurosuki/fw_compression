@@ -201,7 +201,72 @@ does not track MSE anyway.
 
 ---
 
-## 6. Reproduce
+## 6. Top-K transport-event representation (does Ghost-FWL need a dense waveform?)
+
+Instead of compress→reconstruct, replace each waveform by a **sparse list of top-K
+transport events** `{(t_i, a_i, w_i)}` (peak position, intensity, FWHM), synthesise a
+Gaussian-pulse pseudo-waveform from them, and feed *that* to the same frozen FWL-ToPM.
+This tests whether the downstream model needs the dense signal `x[t]` or only sparse
+peak/event parameters. See `event_aware_experiment_plan.md`.
+
+- **Extraction** `compression/event_extraction.py`: a faithful single-waveform scipy
+  reference (`find_peaks`/`peak_widths`) **and** a GPU-vectorised batch extractor (height
+  ranking + min-distance NMS, half-max-crossing FWHM) used by the hook — the scipy loop
+  would cost ~2 h/config (~70 µs × 205 k px × 475 frames); the batch path is ~200 ms/frame.
+- **Synthesis** `compression/event_synthesis.py`: `x̂[t]=Σ a_i·exp(−(t−t_i)²/2σ_i²)`,
+  σ=FWHM/(2√(2 ln2)). The `representation` flag is the core ablation — `t` (position only,
+  fixed a,w), `ta` (+intensity), `tw` (+width), `taw` (all three).
+- **Eval**: `run_eval.py --compress event` (same monkey-patch insertion point and
+  T=700-first normalise/de-normalise as the AE hook); sweep `run_sweep_events.py`, plots
+  `run_plot_events.py`. **dim = K·n_params**, ratio = `T/dim`. Tests in `tests/`.
+
+Sweep K∈{1,2,3,4,6,8} × repr∈{t,ta,tw,taw} (divide=3). `downstream/outputs/events/` —
+`f1_vs_ratio.png`, `f1_vs_k.png`, `summary.txt`. Headline rows:
+
+| representation | K | dim | ratio | object | glass | ghost | **F1-mean** |
+|---|--:|--:|--:|--:|--:|--:|--:|
+| **full waveform** | — | 700 | 1× | 0.694 | 0.298 | 0.558 | **0.517** |
+| `taw` | 3 | 9 | **78×** | 0.658 | 0.247 | 0.453 | **0.453** |
+| `taw` | 2 | 6 | **117×** | 0.681 | 0.231 | 0.400 | **0.437** |
+| `taw` | 8 | 24 | 29× | 0.641 | 0.256 | 0.436 | 0.444 |
+| `taw` | 1 | 3 | 233× | 0.696 | 0.124 | 0.029 | 0.283 |
+| `tw`  | 2 | 4 | 175× | 0.581 | 0.213 | 0.301 | 0.365 |
+| `ta`  | 2 | 4 | 175× | 0.341 | 0.161 | 0.348 | 0.283 |
+| `t`   | 2 | 2 | 350× | 0.276 | 0.186 | 0.296 | 0.253 |
+| AE spatial 4×4 (base), best | — | — | 5× | | | | 0.456 |
+| AE spatial 4×4 (AH), best | — | — | 11× | | | | 0.483 |
+
+**Findings**
+1. **Sparse `(t,a,w)` events explain most of the downstream performance.** `taw` K=3 reaches
+   **0.453 = 88 % of the full-waveform F1 (0.517) at 78× compression** — matching the *best
+   base-loss AE* (spatial 4×4, 0.456) which runs at only 5×, and within 0.03 of the *best
+   anti-hallucination AE* (0.483 at 11×). On the F1-vs-ratio curve the `taw` points sit
+   right on the AE-spatial curve but at 6–20× higher compression. This is the headline:
+   **Ghost-FWL perception is largely governed by sparse transport events, not dense
+   waveform fidelity** (the plan's *Case A*).
+2. **Both intensity *and* width are needed — neither alone suffices** (*Case B*). Position
+   only (`t`) plateaus at ~0.17–0.25; adding *only* intensity (`ta`, ~0.28) or *only* width
+   (`tw`, ~0.30–0.37) helps modestly, but `taw` jumps to ~0.44–0.45. Width (`tw`) helps
+   more than intensity (`ta`), especially for **object** (0.58 vs 0.34 at K=2) — pulse
+   *shape* is a strong transport cue. This distinguishes full-waveform LiDAR from ordinary
+   multi-echo LiDAR: the (a,w) pulse parameters, not just multi-return geometry, carry the signal.
+3. **`taw` plateaus from K≈2–3** (117×–78×) and barely improves out to K=8 (29×) — the
+   first 2–3 events capture nearly all downstream-relevant structure. K=1 keeps **object**
+   intact (0.696 ≈ full 0.694, the primary return) but **ghost collapses** (0.029): ghosts
+   are *secondary* returns, so K≥2 is essential (ghost 0.029→0.400 from K=1→2).
+4. **Glass is the stress class** (*Case D*): even `taw` tops out ~0.25 and never reaches the
+   already-low full-waveform 0.30. Transparent-object cues are not captured by simple top-K
+   peaks — they likely need subtle residuals/tails or spatial context. Glass should be a
+   stress test, not the success criterion.
+
+**Interpretation / next direction.** Because `(t,a,w)` is strong, the indicated research
+direction is **event-faithful full-waveform compression** — an AE (or codec) regularised to
+preserve peak position/intensity/width rather than minimising MSE (consistent with §4: the
+anti-hallucination loss, which protects peak/background structure, already beats MSE-optimal
+recon downstream). Glass and dense-residual structure are where a *hybrid* (sparse events +
+a small dense-residual/tail token) could close the remaining gap to the AH-AE.
+
+## 7. Reproduce
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
@@ -214,6 +279,10 @@ uv run python downstream/run_eval.py --config downstream/configs/evalA_split2_te
 # sweeps (base-loss AEs / anti-hallucination AEs) + plots
 uv run python downstream/run_sweep.py    && uv run python downstream/run_plot.py
 uv run python downstream/run_sweep_ah.py && uv run python downstream/run_plot_compare.py
+
+# top-K transport-event sweep + plots
+uv run python downstream/run_sweep_events.py && uv run python downstream/run_plot_events.py
+uv run --with pytest python -m pytest tests/   # event extraction/synthesis unit tests
 ```
 
 Retrain the AEs (SPLIT2, with anti-hallucination loss):
@@ -224,10 +293,22 @@ uv run python train_spatial.py --split split2 \
     --bg_weight 5.0 --fp_weight 0.5 --run_name real_split2_spatial_ah --device cuda:1
 ```
 
-## 7. Caveats / TODO
+## 8. Caveats / TODO
 - **Evaluator B** (base ViT3D *without* token pruning/merging) not yet run — no matching
   base checkpoint on disk; may be realisable by toggling pruning off on the same ckpt.
-- Sweeps use `divide=3`; re-confirm headline configs at full resolution.
+- Sweeps use `divide=3`; this matches full resolution for the F1 metric — the divide=3
+  no-compression `none.json` (object/glass/ghost = 0.694/0.298/0.558) is **identical** to
+  the full-res `evalA_noignore.json` (voxel counts are huge, so the confusion matrix
+  converges). **Confirmed for the event configs too** (`downstream/outputs/events/fullres/`,
+  full 1427 frames): `taw` K=3 = **0.4514** (vs divide=3 0.4525) and `taw` K=2 = **0.4364**
+  (vs 0.4374) — agreement within 0.001, so all divide=3 event numbers above stand.
+- The downstream **event hook uses the GPU-vectorised extractor** (height ranking + NMS),
+  not the scipy `prominence` reference — the two agree on the few tallest well-separated
+  peaks we keep but can differ on overlapping/shoulder peaks; `rank_by=prominence`/`area`
+  and `intensity_mode=area` ablations not yet swept.
+- Event reps not yet tried: `taw_bg` (background floor) and the dense-residual/tail
+  extensions suggested by the glass collapse (§6 finding 4).
 - Peak-level F1 (the repo's per-peak metric) and the waveform-level spurious-peak
   metrics (`false_ghost_rate`, `evaluate_autoencoder.py`) not yet tabulated AH-vs-base.
-- Single seed; weights bg/fp not swept.
+- Single seed; weights bg/fp not swept; event detection params (smooth_sigma, min_height,
+  min_distance, fixed_width) at defaults.

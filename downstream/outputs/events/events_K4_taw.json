@@ -1,0 +1,60 @@
+{
+  "compress": "event",
+  "ae_ckpt": null,
+  "ae_meta": {
+    "k": 4,
+    "representation": "taw",
+    "intensity_mode": "height",
+    "smooth_sigma": 1.5,
+    "min_height": 0.03,
+    "min_distance": 3,
+    "fixed_width": 4.0,
+    "fixed_amplitude": 1.0,
+    "dim": 12
+  },
+  "macro_f1": 0.4458443015097174,
+  "macro_f1_4class": 0.5813577516779274,
+  "ignore_visualize_labels": [],
+  "per_class_f1": {
+    "object": 0.6467335759524632,
+    "glass": 0.24868162661195672,
+    "ghost": 0.4421177019647323
+  },
+  "per_class_precision": {
+    "object": 0.6731920920052687,
+    "glass": 0.18391104529434987,
+    "ghost": 0.3397106629473746
+  },
+  "per_class_recall": {
+    "object": 0.6222762103700605,
+    "glass": 0.38387711755623166,
+    "ghost": 0.632911099914353
+  },
+  "confusion_matrix": [
+    [
+      4508884395,
+      34217055,
+      12524894,
+      26744524
+    ],
+    [
+      26721038,
+      96312877,
+      19796243,
+      11944965
+    ],
+    [
+      4267879,
+      7424721,
+      7394061,
+      174870
+    ],
+    [
+      5993611,
+      5114284,
+      489353,
+      19995230
+    ]
+  ],
+  "checkpoint": "/data3/user/yoshida/fwl_mae/neurips2026/checkpoints/paper/pruning0.7merging0.9-vit3d-neurips-refactered/vit3d_lr0.0001_timm-cosine_epoch50_div3_aug-only-cutmix0.2_0.8/0512/vit3d_ordered_pruning_light_finetune_epoch_50_20260512_150711_0.02485.pth"
+}

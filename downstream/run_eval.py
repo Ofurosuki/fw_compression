@@ -122,6 +122,45 @@ def install_compression_hook(model, kind, device):
 
 
 # --------------------------------------------------------------------------- #
+# Top-K transport-event "compression": extract events -> synthesise pseudo-wave.
+# --------------------------------------------------------------------------- #
+@torch.no_grad()
+def event_voxel(vox_xyz, ep, device, eps=1e-6):
+    """vox_xyz: np.float32 (X, Y, T). Per-pixel max-normalise -> top-K events ->
+    Gaussian-pulse synthesis -> de-normalise. Background (max<=eps) pixels pass
+    through unchanged. ``ep`` is the event-param dict."""
+    from compression.event_extraction import extract_topk_events_batch
+    from compression.event_synthesis import synthesize_batch
+
+    X, Y, T = vox_xyz.shape
+    w = torch.from_numpy(np.ascontiguousarray(vox_xyz)).to(device).reshape(-1, T)
+    mx = w.amax(dim=1, keepdim=True)
+    valid = (mx > eps).squeeze(1)
+    wn = torch.where(mx > eps, w / mx, w)
+
+    events, vmask = extract_topk_events_batch(
+        wn, ep["k"], smooth_sigma=ep["smooth_sigma"], min_height=ep["min_height"],
+        min_distance=ep["min_distance"], intensity_mode=ep["intensity_mode"])
+    rec = synthesize_batch(events, vmask, T=T, representation=ep["representation"],
+                           fixed_amplitude=ep["fixed_amplitude"],
+                           fixed_width=ep["fixed_width"], normalize=True)
+    rec = torch.clamp(rec, min=0.0) * mx
+    w_out = torch.where(valid.unsqueeze(1), rec, w)
+    return w_out.reshape(X, Y, T).cpu().numpy()
+
+
+def install_event_hook(ep, device):
+    orig = _dv.VoxelDataset._load_voxel_grid
+
+    def patched(self, file_path):
+        vox = orig(self, file_path).astype(np.float32)
+        return event_voxel(vox, ep, device)
+
+    _dv.VoxelDataset._load_voxel_grid = patched
+    return orig
+
+
+# --------------------------------------------------------------------------- #
 # Evaluation loop (confusion-matrix F1, no peak detection).
 # --------------------------------------------------------------------------- #
 @torch.no_grad()
@@ -216,11 +255,59 @@ def viz_waveforms(config, ae_model, kind, device, out_png, title):
     print("saved", out_png)
 
 
+def viz_events(config, ep, device, out_png, title):
+    """Fixed 6-pixel figure: orig waveform, selected events, synthesised pseudo-wave."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from compression.event_extraction import extract_topk_events_batch
+    from compression.event_synthesis import synthesize_batch
+    _, picks = pick_fixed_waveforms(config)
+    fig, axes = plt.subplots(2, 3, figsize=(15, 8))
+    for ax, (pix, w, a) in zip(axes.ravel(), picks):
+        mx = float(w.max()) or 1.0
+        wn = torch.from_numpy((w / mx)[None]).float().to(device)
+        ev, vm = extract_topk_events_batch(
+            wn, ep["k"], smooth_sigma=ep["smooth_sigma"], min_height=ep["min_height"],
+            min_distance=ep["min_distance"], intensity_mode=ep["intensity_mode"])
+        rec = synthesize_batch(ev, vm, T=w.shape[0], representation=ep["representation"],
+                               fixed_amplitude=ep["fixed_amplitude"],
+                               fixed_width=ep["fixed_width"], normalize=True)[0].cpu().numpy()
+        ev0, vm0 = ev[0].cpu().numpy(), vm[0].cpu().numpy()
+        ax.plot(w / mx, "k-", lw=1.0, label="orig")
+        ax.plot(np.clip(rec, 0, None), "r-", lw=1.0, alpha=0.8, label="event synth")
+        for i in np.where(vm0)[0]:
+            ax.axvline(ev0[i, 0], color="tab:orange", ls=":", lw=1.0)
+        for c, col in [(1, "tab:green"), (2, "tab:blue"), (3, "tab:red")]:
+            bins = np.where(a == c)[0]
+            if len(bins):
+                pk = bins[np.argmax((w / mx)[bins])]
+                ax.plot(pk, (w / mx)[pk], "o", color=col, ms=7)
+        ax.set_title(f"pix#{pix} ghost={(a==3).any()} K_used={int(vm0.sum())}", fontsize=9)
+        ax.set_ylim(-0.05, 1.05)
+    axes.ravel()[0].legend(fontsize=8)
+    fig.suptitle(title)
+    plt.tight_layout()
+    os.makedirs(os.path.dirname(out_png), exist_ok=True)
+    plt.savefig(out_png, dpi=120)
+    plt.close()
+    print("saved", out_png)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", required=True)
-    ap.add_argument("--compress", choices=["none", "ae"], default="none")
+    ap.add_argument("--compress", choices=["none", "ae", "event"], default="none")
     ap.add_argument("--ae_ckpt", default=None)
+    # event-mode params
+    ap.add_argument("--event_k", type=int, default=4)
+    ap.add_argument("--event_repr", choices=["t", "ta", "tw", "taw", "taw_bg"], default="taw")
+    ap.add_argument("--event_intensity", choices=["height", "area"], default="height")
+    ap.add_argument("--event_smooth_sigma", type=float, default=1.5)
+    ap.add_argument("--event_min_height", type=float, default=0.03)
+    ap.add_argument("--event_min_distance", type=int, default=3)
+    ap.add_argument("--event_fixed_width", type=float, default=4.0)
+    ap.add_argument("--event_fixed_amplitude", type=float, default=1.0)
     ap.add_argument("--device", default=None)
     ap.add_argument("--limit_dirs", type=int, default=0, help="use only first N dirs (smoke)")
     ap.add_argument("--divide", type=int, default=0, help="subsample 1/divide of frames (0=use config)")
@@ -247,6 +334,7 @@ def main():
 
     # optional compression hook (applied to raw T=700 voxel before crops)
     ae_model = ae_kind = ae_meta = None
+    event_params = None
     nw = config.num_workers
     if args.compress == "ae":
         assert args.ae_ckpt, "--ae_ckpt required for --compress ae"
@@ -254,6 +342,18 @@ def main():
         install_compression_hook(ae_model, ae_kind, device)
         nw = 0  # GPU compression in __getitem__ needs the main process
         print(f"[compress] {ae_kind} {ae_meta}")
+    elif args.compress == "event":
+        event_params = {
+            "k": args.event_k, "representation": args.event_repr,
+            "intensity_mode": args.event_intensity, "smooth_sigma": args.event_smooth_sigma,
+            "min_height": args.event_min_height, "min_distance": args.event_min_distance,
+            "fixed_width": args.event_fixed_width, "fixed_amplitude": args.event_fixed_amplitude,
+        }
+        n_params = {"t": 1, "ta": 2, "tw": 2, "taw": 3, "taw_bg": 3}[args.event_repr]
+        ae_meta = {**event_params, "dim": args.event_k * n_params}
+        install_event_hook(event_params, device)
+        nw = 0  # GPU work in __getitem__ needs the main process
+        print(f"[event] {ae_meta}")
 
     ds = VoxelDatasetWithToMe(
         voxel_dirs=config.test_voxel_dirs, annotation_dirs=config.test_annotation_dirs,
@@ -297,6 +397,10 @@ def main():
     if args.viz_out and ae_model is not None:
         viz_waveforms(config, ae_model, ae_kind, device, args.viz_out,
                       title=f"{ae_kind} {ae_meta}  F1-mean={res['macro_f1']:.3f}")
+    if args.viz_out and event_params is not None:
+        viz_events(config, event_params, device, args.viz_out,
+                   title=f"event K={event_params['k']} {event_params['representation']} "
+                         f"dim={ae_meta['dim']}  F1-mean={res['macro_f1']:.3f}")
 
 
 if __name__ == "__main__":

@@ -3,13 +3,19 @@
 Loads the frozen, pre-trained Ghost-FWL segmentation model (vit3d / FWL-ToPM)
 from the evolved repo, optionally inserts a "compress -> reconstruct" transform on
 the RAW (T=700) per-pixel waveforms BEFORE the downstream's own crop pipeline, and
-reports the per-voxel F1-mean (object/glass/ghost, Noise excluded) — the same
-metric the paper reports.
+reports the per-voxel ("voxel-level") F1-mean (object/glass/ghost, Noise excluded).
+
+NB on metric (see downstream/SCORE_DISCREPANCY.md): this emits VOXEL-level F1 (scores
+all ~10M voxels/frame). The PAPER's headline "F1-mean ~0.592" is the repo's PEAK-level
+F1 (`peak_macro_f1`: scored only at scipy `find_peaks` return-peak positions), which
+runs ~0.07 higher (baseline neurips_best: voxel 0.532 vs peak 0.599 on the 3-scene set).
+We deliberately SKIP the slow per-pixel peak detection here (it dominates runtime), so
+our number is NOT directly comparable to the paper's. For a paper-comparable score you
+must add peak-level scoring (only worth it for headline configs; ~2h/config). Voxel-level
+is fine and self-consistent for RELATIVE comparisons across compression methods.
 
 The compression is applied by monkey-patching ``VoxelDataset._load_voxel_grid`` so
-all of the downstream's cropping/normalisation is reused untouched. We skip the
-repo's slow per-pixel scipy peak detection (it dominates runtime and is not needed
-for the headline F1).
+all of the downstream's cropping/normalisation is reused untouched.
 
 Usage:
   PYTHONPATH=<repo>/src uv run python downstream/run_eval.py \
@@ -143,7 +149,9 @@ def event_voxel(vox_xyz, ep, device, eps=1e-6):
         min_distance=ep["min_distance"], intensity_mode=ep["intensity_mode"])
     rec = synthesize_batch(events, vmask, T=T, representation=ep["representation"],
                            fixed_amplitude=ep["fixed_amplitude"],
-                           fixed_width=ep["fixed_width"], normalize=True)
+                           fixed_width=ep["fixed_width"], normalize=True,
+                           kernel=ep.get("kernel", "gaussian"),
+                           emg_tau=ep.get("emg_tau", 2.65))
     rec = torch.clamp(rec, min=0.0) * mx
     w_out = torch.where(valid.unsqueeze(1), rec, w)
     return w_out.reshape(X, Y, T).cpu().numpy()
@@ -308,6 +316,8 @@ def main():
     ap.add_argument("--event_min_distance", type=int, default=3)
     ap.add_argument("--event_fixed_width", type=float, default=4.0)
     ap.add_argument("--event_fixed_amplitude", type=float, default=1.0)
+    ap.add_argument("--event_kernel", choices=["gaussian", "emg"], default="gaussian")
+    ap.add_argument("--event_emg_tau", type=float, default=2.65)
     ap.add_argument("--device", default=None)
     ap.add_argument("--limit_dirs", type=int, default=0, help="use only first N dirs (smoke)")
     ap.add_argument("--divide", type=int, default=0, help="subsample 1/divide of frames (0=use config)")
@@ -351,6 +361,7 @@ def main():
             "intensity_mode": args.event_intensity, "smooth_sigma": args.event_smooth_sigma,
             "min_height": args.event_min_height, "min_distance": args.event_min_distance,
             "fixed_width": args.event_fixed_width, "fixed_amplitude": args.event_fixed_amplitude,
+            "kernel": args.event_kernel, "emg_tau": args.event_emg_tau,
         }
         n_params = {"t": 1, "ta": 2, "tw": 2, "taw": 3, "taw_bg": 3}[args.event_repr]
         ae_meta = {**event_params, "dim": args.event_k * n_params}

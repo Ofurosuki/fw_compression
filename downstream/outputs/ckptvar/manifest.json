@@ -1,0 +1,98 @@
+[
+  {
+    "tag": "only-cutmix_0.02485",
+    "val": "0.02485",
+    "variant": "only-cutmix",
+    "config": "downstream/configs/ckptvar/only-cutmix_0.02485.yaml"
+  },
+  {
+    "tag": "baseline_0.02523",
+    "val": "0.02523",
+    "variant": "baseline",
+    "config": "downstream/configs/ckptvar/baseline_0.02523.yaml"
+  },
+  {
+    "tag": "only-cutmix_0.02539",
+    "val": "0.02539",
+    "variant": "only-cutmix",
+    "config": "downstream/configs/ckptvar/only-cutmix_0.02539.yaml"
+  },
+  {
+    "tag": "only-cutmix_0.02587",
+    "val": "0.02587",
+    "variant": "only-cutmix",
+    "config": "downstream/configs/ckptvar/only-cutmix_0.02587.yaml"
+  },
+  {
+    "tag": "rotate-noise_0.02597",
+    "val": "0.02597",
+    "variant": "rotate+noise",
+    "config": "downstream/configs/ckptvar/rotate-noise_0.02597.yaml"
+  },
+  {
+    "tag": "only-cutmix_0.02608",
+    "val": "0.02608",
+    "variant": "only-cutmix",
+    "config": "downstream/configs/ckptvar/only-cutmix_0.02608.yaml"
+  },
+  {
+    "tag": "cutmix-shift_0.02827",
+    "val": "0.02827",
+    "variant": "cutmix+shift",
+    "config": "downstream/configs/ckptvar/cutmix-shift_0.02827.yaml"
+  },
+  {
+    "tag": "simple-shift_0.02866",
+    "val": "0.02866",
+    "variant": "simple-shift",
+    "config": "downstream/configs/ckptvar/simple-shift_0.02866.yaml"
+  },
+  {
+    "tag": "only-shift_0.02968",
+    "val": "0.02968",
+    "variant": "only-shift",
+    "config": "downstream/configs/ckptvar/only-shift_0.02968.yaml"
+  },
+  {
+    "tag": "no-cutmix_0.03005",
+    "val": "0.03005",
+    "variant": "no-cutmix",
+    "config": "downstream/configs/ckptvar/no-cutmix_0.03005.yaml"
+  },
+  {
+    "tag": "simple-all_0.03046",
+    "val": "0.03046",
+    "variant": "simple-all",
+    "config": "downstream/configs/ckptvar/simple-all_0.03046.yaml"
+  },
+  {
+    "tag": "no-shift_0.03508",
+    "val": "0.03508",
+    "variant": "no-shift",
+    "config": "downstream/configs/ckptvar/no-shift_0.03508.yaml"
+  },
+  {
+    "tag": "no-rotate_0.03553",
+    "val": "0.03553",
+    "variant": "no-rotate",
+    "config": "downstream/configs/ckptvar/no-rotate_0.03553.yaml"
+  },
+  {
+    "tag": "all_0.03554",
+    "val": "0.03554",
+    "variant": "all",
+    "config": "downstream/configs/ckptvar/all_0.03554.yaml"
+  },
+  {
+    "tag": "all_0.03560",
+    "val": "0.03560",
+    "variant": "all",
+    "config": "downstream/configs/ckptvar/all_0.03560.yaml"
+  },
+  {
+    "tag": "no-noise_0.03591",
+    "val": "0.03591",
+    "variant": "no-noise",
+    "config": "downstream/configs/ckptvar/no-noise_0.03591.yaml"
+  }
+]

@@ -20,10 +20,15 @@ compressed-then-reconstructed waveforms and measuring its F1.
 
 ### Metric
 - **F1-mean = mean of the per-class F1 over {object, glass, ghost}**, computed from the
-  per-voxel confusion matrix (softmax + threshold-0.5 prediction), **exactly as the
-  Ghost-FWL repo / paper do**: `ignore_visualize_labels = []`, i.e. **Noise stays in the
+  **voxel-level** confusion matrix (softmax + threshold-0.5 prediction over all voxels),
+  using the repo's `ignore_visualize_labels = []` convention: **Noise stays in the
   confusion matrix as a competing class** (false positives onto/from Noise *do* penalise
   the signal classes); Noise is only dropped from the *average*.
+  - ⚠️ **voxel-level ≠ the paper's metric.** The paper's "F1-mean ~0.592" is the repo's
+    **peak-level** F1 (`peak_macro_f1`, scored only at `find_peaks` return-peak positions),
+    ~0.07 higher than voxel-level. We skip peak detection (slow); numbers here are
+    voxel-level and self-consistent for *relative* comparisons but not paper-comparable.
+    See **`SCORE_DISCREPANCY.md`** (resolved 2026-06-13).
   - ⚠️ *Convention matters by ~0.14.* An earlier version of this harness used
     `ignore_visualize_labels = [0]`, which additionally **masks all true-Noise voxels out
     of the confusion matrix** — that inflates F1 (background→ghost mistakes stop counting):
@@ -80,11 +85,16 @@ FWL-ToPM on the split2 test set (divide=3 sweep baseline), original waveforms
 |---|---|---|---|---|
 | F1 | 0.694 | 0.298 | 0.558 | **0.517** |
 
-For reference the paper reports F1-mean ≈ **0.592** for FWL-ToPM; our 0.517 on these 3
-split2 test scenes with the `aug-only-cutmix0.2_0.8` checkpoint sits a little below it
-(plausibly checkpoint/aug-variant and scene differences — same convention, same code).
-Glass is intrinsically the hardest class (transparent, minority) — only ~0.30 even
-uncompressed — and is the first to degrade under compression.
+The paper reports F1-mean ≈ **0.592** for FWL-ToPM. Our **voxel-level** 0.517 is NOT
+directly comparable: the paper's number is the repo's **peak-level** F1 (scored only at
+`find_peaks` return-peak positions), which is ~0.07 higher than voxel-level. On the exact
+baseline ckpt + 3-scene set, repo-native `run_test.py` emits **voxel 0.532 / peak 0.599**
+simultaneously, and 0.599 ≈ the paper's 0.592 — i.e. same algorithm/weights/data/threshold,
+the only difference is the scoring population. We skip the slow per-pixel peak detection, so
+all numbers in this doc are voxel-level (self-consistent for relative comparisons). **Full
+investigation + resolution: `downstream/SCORE_DISCREPANCY.md`.** Glass is intrinsically the
+hardest class (transparent, minority) — only ~0.30 even uncompressed — and degrades first
+under compression.
 
 ---
 

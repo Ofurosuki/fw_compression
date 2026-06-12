@@ -24,6 +24,41 @@ import torch
 _FWHM_TO_SIGMA = 1.0 / (2.0 * math.sqrt(2.0 * math.log(2.0)))
 
 
+def _emg_causal_filter(wave, tau, sigma_ref):
+    """Convolve (N,T) ``wave`` with a one-sided exponential decay (time const
+    ``tau`` bins) to turn each symmetric Gaussian pulse into an EMG (exponentially
+    -modified Gaussian) with a right-hand tail. The convolution shifts the mode
+    right; we compensate with an integer left-shift computed from a reference
+    Gaussian (``sigma_ref``) so the synthesised peak stays at the extracted t_i.
+
+    EMG = Gaussian ⊛ exp(-s/tau)·u(s), the standard asymmetric-pulse model. Real
+    FW-LiDAR returns are right-skewed (measured skew ≈ +0.78); see
+    downstream/analyze_pulse_shape.py.
+    """
+    import torch.nn.functional as F
+    dev, dt = wave.device, wave.dtype
+    L = int(math.ceil(6.0 * tau))
+    s = torch.arange(L + 1, device=dev, dtype=dt)
+    h = torch.exp(-s / tau)
+    h = h / h.sum()
+    # causal conv y[t] = Σ_{s>=0} h[s] x[t-s]: pad left by L, correlate with h
+    # reversed (see derivation in commit msg); conv1d does cross-correlation.
+    w = h.flip(0).view(1, 1, -1)
+    x = F.pad(wave.unsqueeze(1), (L, 0))
+    y = F.conv1d(x, w).squeeze(1)                          # (N, T)
+    # peak-shift compensation from a reference Gaussian centred at c
+    Tl = wave.shape[1]
+    c = Tl // 2
+    tt = torch.arange(Tl, device=dev, dtype=dt)
+    g = torch.exp(-((tt - c) ** 2) / (2.0 * sigma_ref ** 2)).view(1, Tl)
+    gp = F.pad(g.unsqueeze(1), (L, 0))
+    gc = F.conv1d(gp, w).squeeze(1)
+    shift = int(torch.argmax(gc[0]).item()) - c            # mode offset (>0)
+    if shift > 0:
+        y = F.pad(y[:, shift:], (0, shift))                # left-shift, zero-pad
+    return y
+
+
 def _resolve(representation, fixed_amplitude, fixed_width):
     """Return (use_a, use_w, add_bg) flags for a representation string."""
     use_a = representation in ("ta", "taw", "taw_bg")
@@ -94,12 +129,17 @@ def synthesize_batch(
     fixed_width: float = 4.0,
     background: float = 0.0,
     normalize: bool = True,
+    kernel: str = "gaussian",
+    emg_tau: float = 2.65,
 ):
     """Vectorised synthesis for a batch of event sets.
 
     Args:
         events: ``(N, K, 3)`` torch tensor, columns ``[t, a, w]``.
         valid: ``(N, K)`` bool tensor.
+        kernel: ``"gaussian"`` (symmetric) or ``"emg"`` (right-tailed asymmetric,
+            Gaussian ⊛ exp(-s/emg_tau)). EMG better matches real returns.
+        emg_tau: exponential decay time constant in bins (fit ≈ 2.65).
         (other args as in :func:`synthesize_waveform_from_events`).
 
     Returns:
@@ -120,6 +160,12 @@ def synthesize_batch(
     diff = t_grid[None, None, :] - t_i[:, :, None]         # (N,K,T)
     g = a_i[:, :, None] * torch.exp(-(diff ** 2) / (2.0 * (sigma ** 2)[:, :, None]))
     wave = g.sum(dim=1)                                    # (N,T)
+    if kernel == "emg":
+        # reference sigma = median of valid widths (falls back to fixed_width)
+        sw = sigma[valid]
+        sigma_ref = float(sw.median().item()) if sw.numel() > 0 else \
+            fixed_width * _FWHM_TO_SIGMA
+        wave = _emg_causal_filter(wave, emg_tau, sigma_ref)
     if add_bg:
         wave = wave + background
 

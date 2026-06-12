@@ -6,6 +6,7 @@ Outputs (downstream/outputs/events/):
   f1_vs_k.png         per-class F1 vs K for each representation
   compare.txt         headline comparison table (events vs best AE vs full)
 """
+import argparse
 import glob
 import json
 import os
@@ -14,7 +15,14 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-EV = "downstream/outputs/events"
+ap = argparse.ArgumentParser()
+ap.add_argument("--ev", default="downstream/outputs/events", help="event sweep output dir")
+ap.add_argument("--no_ae", action="store_true",
+                help="skip AE baselines overlay (use when events were run with a "
+                     "different downstream checkpoint than the AE sweeps)")
+cli = ap.parse_args()
+
+EV = cli.ev
 SWEEP = "downstream/outputs/sweep"
 SWEEP_AH = "downstream/outputs/sweep_ah"
 T, P = 700, 16
@@ -62,8 +70,8 @@ def ae_rows(folder, label):
     return out
 
 
-ae_base = ae_rows(SWEEP, "base") if os.path.isdir(SWEEP) else []
-ae_ah = ae_rows(SWEEP_AH, "ah") if os.path.isdir(SWEEP_AH) else []
+ae_base = ae_rows(SWEEP, "base") if (os.path.isdir(SWEEP) and not cli.no_ae) else []
+ae_ah = ae_rows(SWEEP_AH, "ah") if (os.path.isdir(SWEEP_AH) and not cli.no_ae) else []
 
 # ---- table ----
 hdr = f"{'repr':6s} {'K':>2s} {'dim':>4s} {'ratio':>7s} {'object':>7s} {'glass':>7s} {'ghost':>7s} {'F1-mean':>8s}"
@@ -108,7 +116,8 @@ if base:
 ax.set_xscale("log", base=2)
 ax.set_xlabel("compression ratio (T / dim)")
 ax.set_ylabel("downstream F1-mean (object/glass/ghost)")
-ax.set_title("Top-K transport events vs AE compression (FWL-ToPM, split2 test)")
+ax.set_title("Top-K transport events vs full waveform (FWL-ToPM, split2 test)" if cli.no_ae
+             else "Top-K transport events vs AE compression (FWL-ToPM, split2 test)")
 ax.grid(True, which="both", alpha=0.3)
 ax.legend(fontsize=8, ncol=2)
 plt.tight_layout()

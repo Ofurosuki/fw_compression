@@ -8,14 +8,21 @@ K          ∈ {1,2,3,4,6,8}
 repr       ∈ {t, ta, tw, taw}   (position / +intensity / +width / all three)
 divide=3 for speed. Writes events_K{K}_{repr}.json + a 6-waveform viz.
 """
+import argparse
 import os
 import subprocess
 import threading
 
+ap = argparse.ArgumentParser()
+ap.add_argument("--config", default="downstream/configs/evalA_split2_test.yaml")
+ap.add_argument("--out", default="downstream/outputs/events")
+ap.add_argument("--divide", default="3")
+cli = ap.parse_args()
+
 REPO = "/data3/user/yoshida/fwl_mae/neurips2026"
-CFG = "downstream/configs/evalA_split2_test.yaml"
-DIVIDE = "3"
-OUT = "downstream/outputs/events"
+CFG = cli.config
+DIVIDE = cli.divide
+OUT = cli.out
 VIZ = OUT + "/viz"
 GPUS = ["cuda:0", "cuda:1", "cuda:2", "cuda:3"]
 KS = [1, 2, 3, 4, 6, 8]

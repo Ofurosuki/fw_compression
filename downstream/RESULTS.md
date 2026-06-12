@@ -220,59 +220,78 @@ peak/event parameters. See `event_aware_experiment_plan.md`.
   T=700-first normalise/de-normalise as the AE hook); sweep `run_sweep_events.py`, plots
   `run_plot_events.py`. **dim = K·n_params**, ratio = `T/dim`. Tests in `tests/`.
 
-Sweep K∈{1,2,3,4,6,8} × repr∈{t,ta,tw,taw} (divide=3). `downstream/outputs/events/` —
-`f1_vs_ratio.png`, `f1_vs_k.png`, `summary.txt`. Headline rows:
+> **Evaluator updated to `neurips_best`** (2026-06-12). The event sweep was re-run on a
+> stronger FWL-ToPM checkpoint
+> (`…/checkpoints/neurips_best/vit3d_ordered_pruning_light_finetune_epoch_50_20260423_221908_0.02523.pth`,
+> config `downstream/configs/evalA_split2_test_best.yaml`, outputs
+> `downstream/outputs/events_best/`). Its full-waveform F1-mean is **0.524** (vs 0.517 on the
+> prior `0.02485` checkpoint; glass 0.329 vs 0.298). **The headline table and findings 1–2
+> below are on `neurips_best`.** The AE-baseline rows, the ghost diagnostics (finding 3) and
+> the multi-echo table were **not** re-run and remain on the prior checkpoint — flagged inline.
+
+Sweep K∈{1,2,3,4,6,8} × repr∈{t,ta,tw,taw} (divide=3), re-run on `neurips_best`
+(`downstream/outputs/events_best/` — `f1_vs_ratio.png`, `f1_vs_k.png`, `summary.txt`).
+Headline rows:
 
 | representation | K | dim | ratio | object | glass | ghost | **F1-mean** |
 |---|--:|--:|--:|--:|--:|--:|--:|
-| **full waveform** | — | 700 | 1× | 0.694 | 0.298 | 0.558 | **0.517** |
-| `taw` | 3 | 9 | **78×** | 0.658 | 0.247 | 0.453 | **0.453** |
-| `taw` | 2 | 6 | **117×** | 0.681 | 0.231 | 0.400 | **0.437** |
-| `taw` | 8 | 24 | 29× | 0.641 | 0.256 | 0.436 | 0.444 |
-| `taw` | 1 | 3 | 233× | 0.696 | 0.124 | 0.029 | 0.283 |
-| `tw`  | 2 | 4 | 175× | 0.581 | 0.213 | 0.301 | 0.365 |
-| `ta`  | 2 | 4 | 175× | 0.341 | 0.161 | 0.348 | 0.283 |
-| `t`   | 2 | 2 | 350× | 0.276 | 0.186 | 0.296 | 0.253 |
-| AE spatial 4×4 (base), best | — | — | 5× | | | | 0.456 |
-| AE spatial 4×4 (AH), best | — | — | 11× | | | | 0.483 |
+| **full waveform** | — | 700 | 1× | 0.694 | 0.329 | 0.547 | **0.524** |
+| `taw` | 2 | 6 | **117×** | 0.606 | 0.247 | 0.424 | **0.426** |
+| `taw` | 3 | 9 | **78×** | 0.582 | 0.255 | 0.407 | **0.414** |
+| `taw` | 8 | 24 | 29× | 0.595 | 0.258 | 0.393 | 0.415 |
+| `taw` | 1 | 3 | 233× | 0.555 | 0.176 | 0.042 | 0.258 |
+| `tw`  | 2 | 4 | 175× | 0.465 | 0.247 | 0.309 | 0.341 |
+| `ta`  | 4 | 8 | 88× | 0.086 | 0.145 | 0.298 | 0.176 |
+| `t`   | 3 | 3 | 233× | 0.096 | 0.133 | 0.246 | 0.158 |
 
-**Findings**
-1. **Sparse `(t,a,w)` events explain most of the downstream performance.** `taw` K=3 reaches
-   **0.453 = 88 % of the full-waveform F1 (0.517) at 78× compression** — matching the *best
-   base-loss AE* (spatial 4×4, 0.456) which runs at only 5×, and within 0.03 of the *best
-   anti-hallucination AE* (0.483 at 11×). On the F1-vs-ratio curve the `taw` points sit
-   right on the AE-spatial curve but at 6–20× higher compression. This is the headline:
-   **Ghost-FWL perception is largely governed by sparse transport events, not dense
-   waveform fidelity** (the plan's *Case A*).
-2. **Both intensity *and* width are needed — neither alone suffices** (*Case B*). Position
-   only (`t`) plateaus at ~0.17–0.25; adding *only* intensity (`ta`, ~0.28) or *only* width
-   (`tw`, ~0.30–0.37) helps modestly, but `taw` jumps to ~0.44–0.45. Width (`tw`) helps
-   more than intensity (`ta`), especially for **object** (0.58 vs 0.34 at K=2) — pulse
-   *shape* is a strong transport cue. This distinguishes full-waveform LiDAR from ordinary
-   multi-echo LiDAR: the (a,w) pulse parameters, not just multi-return geometry, carry the signal.
+*(prior `0.02485` checkpoint, for reference: full waveform 0.517; best `taw` K=3 = 0.453;
+AE spatial-4×4 base 0.456 / anti-halluc 0.483 — see git history for the full prior table.)*
 
-   **Multi-echo-LiDAR analogue (K=4, full-res confirmed).** `ta` K=4 — up to 4 returns each
-   with range+intensity but *no pulse width/shape* — is exactly what a conventional
-   multi-echo LiDAR delivers. Adding width (`taw` K=4) **nearly doubles** the downstream F1:
+**Findings** (on `neurips_best`)
+1. **Sparse `(t,a,w)` events still explain most of the downstream performance.** `taw` peaks
+   at **K=2: 0.426 = 81 % of the full-waveform F1 (0.524) at 117× compression**, and is flat
+   (0.41–0.43) out to K=8. On the F1-vs-ratio curve `taw` sits well above the other reps and
+   only ~0.1 below the full-waveform line across 30–120×. The headline holds: **Ghost-FWL
+   perception is largely governed by sparse transport events, not dense waveform fidelity**
+   (the plan's *Case A*). Note: this *stronger* checkpoint relies **more** on dense waveform
+   than the prior one — the event↔full gap widened (88 %→81 %) and the optimum shifted from
+   K=3 to K=2 — i.e. a better-trained model extracts somewhat more from the dense signal.
+2. **Both intensity *and* width are needed — neither alone suffices, and the effect is
+   sharper here** (*Case B*). Position only (`t`) collapses to ~0.13–0.16; adding *only*
+   intensity (`ta`, ~0.15–0.18) barely helps; adding *only* width (`tw`, ~0.28–0.34) helps
+   much more; `taw` jumps to ~0.41–0.43. Width (`tw`) again dominates intensity (`ta`),
+   especially on **object** (0.47 vs 0.07 at K=2). Pulse *shape* is the key transport cue —
+   this distinguishes full-waveform LiDAR from ordinary multi-echo LiDAR.
 
-   | repr (K=4) | dim | object | glass | ghost | **F1-mean** (full-res / divide-3) |
+   **Multi-echo-LiDAR analogue (K=4).** `ta` K=4 — up to 4 returns each with range+intensity
+   but *no pulse width/shape* — is exactly what a conventional multi-echo LiDAR delivers.
+   Adding width (`taw` K=4) **more than doubles** the downstream F1 (gap even larger on this
+   checkpoint, divide=3):
+
+   | repr (K=4) | dim | object | glass | ghost | **F1-mean** |
    |---|--:|--:|--:|--:|--:|
-   | `t`  (position only) | 4 | 0.120 | 0.145 | 0.267 | 0.177 |
-   | **`ta` (multi-echo: pos+intensity)** | 8 | 0.268 | 0.174 | 0.343 | **0.262** / 0.263 |
-   | `tw` (pos+width) | 8 | 0.368 | 0.192 | 0.341 | 0.300 |
-   | **`taw` (full-waveform: pos+int+width)** | 12 | 0.637 | 0.258 | 0.448 | **0.448** / 0.446 |
-   | full waveform | 700 | 0.694 | 0.298 | 0.558 | 0.517 |
+   | `t`  (position only) | 4 | 0.094 | 0.111 | 0.216 | 0.140 |
+   | **`ta` (multi-echo: pos+intensity)** | 8 | 0.086 | 0.145 | 0.298 | **0.176** |
+   | `tw` (pos+width) | 8 | 0.429 | 0.151 | 0.327 | 0.303 |
+   | **`taw` (full-waveform: pos+int+width)** | 12 | 0.580 | 0.253 | 0.391 | **0.408** |
+   | full waveform | 700 | 0.694 | 0.329 | 0.547 | 0.524 |
 
-   The **+0.19** from `ta`→`taw` (driven mostly by **object**, 0.27→0.64) is the quantitative
-   value of full-waveform's pulse-shape information *over* a multi-echo sensor — almost as
-   large as the entire remaining gap to the uncompressed waveform. Notably `ta` (0.262) even
-   trails `tw` (0.300): for this downstream task **pulse width matters more than return
-   intensity**, so full-waveform LiDAR is not merely a higher-return-count multi-echo sensor
-   — it carries qualitatively different (shape) information.
-3. **`taw` plateaus from K≈2–3** (117×–78×) and barely improves out to K=8 (29×) — the
-   first 2–3 events capture nearly all downstream-relevant structure. K=1 keeps **object**
-   intact (0.696 ≈ full 0.694, the primary return) but **ghost collapses** (0.029): ghosts
-   are *secondary* returns, so K≥2 is essential (ghost 0.029→0.400 from K=1→2).
+   The **+0.23** from `ta`→`taw` (driven mostly by **object**, 0.09→0.58) is the quantitative
+   value of full-waveform's pulse-shape information *over* a multi-echo sensor — larger than
+   on the prior checkpoint (+0.19) and almost as large as the entire remaining gap to the
+   uncompressed waveform. `ta` (0.176) trails `tw` (0.303) even more decisively here: for this
+   downstream task **pulse width matters far more than return intensity**, so full-waveform
+   LiDAR is not merely a higher-return-count multi-echo sensor — it carries qualitatively
+   different (shape) information.
+3. **`taw` plateaus from K≈2–3** and **ghost needs K≥2** — the first 2–3 events capture
+   nearly all downstream-relevant structure. (On `neurips_best`, ghost goes 0.042→0.424 from
+   K=1→2; unlike the prior checkpoint, K=1 no longer keeps object fully intact — object 0.555
+   at K=1 vs 0.606 at K=2 — the stronger model wants ≥2 events even for the primary return.)
+
+   > ⚠️ **The ghost diagnostics below (finding 3 detail) are on the prior `0.02485`
+   > checkpoint** (`downstream/outputs/events/diag/`) and were not re-run on `neurips_best`;
+   > the qualitative story (ghosts are secondary returns; recall-limited; depth-dependent
+   > losses) is expected to carry over but the exact numbers will differ.
 
    **Why ghost is the bottleneck — diagnosed** (`diag_ghost.py`,
    `downstream/outputs/events/diag/`). The ghost gap is a **recall** problem (precision
@@ -304,6 +323,15 @@ Sweep K∈{1,2,3,4,6,8} × repr∈{t,ta,tw,taw} (divide=3). `downstream/outputs/
      GT / no-compression / event-K3 predictions, the dropped ghosts form **coherent
      regions/bands** (column-level recall 0.88 → 0.71), not scattered voxels — the signature
      of a perturbed 3D-context decision rather than independent per-pixel peak losses.
+   - **The one feature that separates detected vs lost is DEPTH** (`diag_ghost_features.py`,
+     `ghost_feature_candidates.png`; AUROC over 40 k voxels each). Tested 7 candidates —
+     reconstruction error at the ghost (AUROC 0.43), pulse asymmetry (0.49), separation to
+     the nearest stronger return (0.50), spatial isolation at two window sizes (0.46/0.49),
+     ghost-peak rank (0.47) are all near-chance. Only **range/depth position is a real
+     discriminator: AUROC 0.71** — lost ghosts cluster at *early* depth (median d/D=0.23)
+     vs detected at later depth (0.42). I.e. **close-range ghosts (early returns, near the
+     strong primary) are the ones the clean-Gaussian event rep loses**; far/well-separated
+     ghosts survive. (recon-error and isolation lean the expected way but only weakly.)
 4. **Glass is the stress class** (*Case D*): even `taw` tops out ~0.25 and never reaches the
    already-low full-waveform 0.30. Transparent-object cues are not captured by simple top-K
    peaks — they likely need subtle residuals/tails or spatial context. Glass should be a
@@ -330,8 +358,14 @@ uv run python downstream/run_eval.py --config downstream/configs/evalA_split2_te
 uv run python downstream/run_sweep.py    && uv run python downstream/run_plot.py
 uv run python downstream/run_sweep_ah.py && uv run python downstream/run_plot_compare.py
 
-# top-K transport-event sweep + plots
+# top-K transport-event sweep + plots (prior 0.02485 checkpoint, with AE overlay)
 uv run python downstream/run_sweep_events.py && uv run python downstream/run_plot_events.py
+
+# top-K transport-event sweep on the neurips_best checkpoint (current headline)
+uv run python downstream/run_sweep_events.py \
+    --config downstream/configs/evalA_split2_test_best.yaml --out downstream/outputs/events_best
+uv run python downstream/run_plot_events.py --ev downstream/outputs/events_best --no_ae
+
 uv run --with pytest python -m pytest tests/   # event extraction/synthesis unit tests
 ```
 

@@ -1,0 +1,60 @@
+{
+  "compress": "event",
+  "ae_ckpt": null,
+  "ae_meta": {
+    "k": 4,
+    "representation": "tw",
+    "intensity_mode": "height",
+    "smooth_sigma": 1.5,
+    "min_height": 0.03,
+    "min_distance": 3,
+    "fixed_width": 4.0,
+    "fixed_amplitude": 1.0,
+    "dim": 8
+  },
+  "macro_f1": 0.3026843127618251,
+  "macro_f1_4class": 0.4719819628374633,
+  "ignore_visualize_labels": [],
+  "per_class_f1": {
+    "object": 0.4293164248352685,
+    "glass": 0.1513804360611623,
+    "ghost": 0.3273560773890445
+  },
+  "per_class_precision": {
+    "object": 0.5405035035937746,
+    "glass": 0.13158045356477058,
+    "ghost": 0.24958064501874527
+  },
+  "per_class_recall": {
+    "object": 0.35606933421723075,
+    "glass": 0.17819486934865147,
+    "ghost": 0.47554867332660644
+  },
+  "confusion_matrix": [
+    [
+      4498668383,
+      37498887,
+      6251516,
+      39952082
+    ],
+    [
+      79008057,
+      55110675,
+      15924521,
+      4731870
+    ],
+    [
+      10520283,
+      4820637,
+      3432306,
+      488305
+    ],
+    [
+      11560297,
+      4531536,
+      476884,
+      15023761
+    ]
+  ],
+  "checkpoint": "/data3/user/yoshida/fwl_mae/neurips2026/checkpoints/neurips_best/vit3d_ordered_pruning_light_finetune_epoch_50_20260423_221908_0.02523.pth"
+}

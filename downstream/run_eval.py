@@ -313,11 +313,14 @@ def main():
     ap.add_argument("--divide", type=int, default=0, help="subsample 1/divide of frames (0=use config)")
     ap.add_argument("--out", default=None)
     ap.add_argument("--viz_out", default=None)
+    ap.add_argument("--seed", type=int, default=None, help="override config.seed (probes random-crop variance)")
     args = ap.parse_args()
 
     config = load_config_from_yaml(args.config)
     if args.device:
         config.device = args.device
+    if args.seed is not None:
+        config.seed = args.seed
     device = torch.device(config.device if torch.cuda.is_available() else "cpu")
     set_seed(config.seed)
 

@@ -19,7 +19,7 @@ from torch.utils.data import DataLoader
 from eventnet.data import EventFrameDataset, feature_dim
 from eventnet.losses import masked_weighted_ce
 from eventnet.metrics import event_confusion, f1_from_cm
-from eventnet.model import EventTensorNet, count_params
+from eventnet.model import build_model, count_params
 from eventnet.paths import NUM_CLASSES
 
 
@@ -29,7 +29,7 @@ def evaluate_event_level(model, loader, device):
     cm = np.zeros((NUM_CLASSES, NUM_CLASSES), dtype=np.int64)
     for b in loader:
         ev = b["events"].to(device)
-        logits = model(ev)
+        logits = model(ev, b["valid"].to(device))
         pred = logits.argmax(-1).cpu().numpy().ravel()
         cm += event_confusion(pred, b["labels"].numpy().ravel(),
                               b["valid"].numpy().ravel().astype(bool))
@@ -40,14 +40,19 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--K", type=int, default=4)
     ap.add_argument("--feature_mode", default="tdtaw",
-                    choices=["t_only", "t_dt", "ta", "tdta", "taw", "tdtaw"])
+                    choices=["t_only", "t_dt", "ta", "tdta", "taw", "tdtaw",
+                             "taE", "tdtaE", "tdtaEw"])
     ap.add_argument("--frame_stride", type=int, default=7)
     ap.add_argument("--batch_size", type=int, default=8)
     ap.add_argument("--epochs", type=int, default=40)
     ap.add_argument("--lr", type=float, default=1e-3)
     ap.add_argument("--weight_decay", type=float, default=1e-4)
-    ap.add_argument("--emb_dim", type=int, default=32)
+    ap.add_argument("--arch", default="v1", choices=["v1", "v2"])
+    ap.add_argument("--emb_dim", type=int, default=0, help="0 = arch default (v1:32, v2:48)")
     ap.add_argument("--base_channels", type=int, default=64)
+    ap.add_argument("--attn_heads", type=int, default=4)
+    ap.add_argument("--attn_layers", type=int, default=2)
+    ap.add_argument("--unet_levels", type=int, default=3)
     ap.add_argument("--crop", type=int, nargs=2, default=[256, 256])
     ap.add_argument("--class_weights", type=float, nargs=4, default=[0.2, 1.0, 2.0, 2.0])
     ap.add_argument("--num_workers", type=int, default=6)
@@ -71,10 +76,11 @@ def main():
     vl = DataLoader(va, batch_size=1, shuffle=False, num_workers=args.num_workers)
     print(f"train frames={len(tr)} val frames={len(va)}")
 
-    model = EventTensorNet(K=args.K, in_dim=feature_dim(args.feature_mode),
-                           emb_dim=args.emb_dim, num_classes=NUM_CLASSES,
-                           base_channels=args.base_channels).to(device)
-    print(f"model params={count_params(model)/1e6:.2f}M  in_dim={feature_dim(args.feature_mode)}")
+    model = build_model(args.arch, K=args.K, in_dim=feature_dim(args.feature_mode),
+                        num_classes=NUM_CLASSES, emb_dim=(args.emb_dim or None),
+                        base_channels=args.base_channels, attn_heads=args.attn_heads,
+                        attn_layers=args.attn_layers, unet_levels=args.unet_levels).to(device)
+    print(f"arch={args.arch} params={count_params(model)/1e6:.2f}M  in_dim={feature_dim(args.feature_mode)}")
     cw = torch.tensor(args.class_weights, dtype=torch.float32)
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=args.epochs)
@@ -89,7 +95,7 @@ def main():
             ev = b["events"].to(device)
             lab = b["labels"].to(device)
             val = b["valid"].to(device)
-            logits = model(ev)
+            logits = model(ev, val)
             loss = masked_weighted_ce(logits, lab, val, cw)
             opt.zero_grad()
             loss.backward()

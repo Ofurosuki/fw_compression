@@ -21,6 +21,7 @@ from eventnet.cache_events import cache_path
 T = float(paths.T_CROPPED)
 
 # columns each mode feeds the shared event MLP (m = valid mask is always last)
+# E = behind-energy (full-waveform transmitted-energy-past-peak cue)
 FEATURE_COLUMNS = {
     "t_only": ["t", "m"],
     "t_dt":   ["t", "dt", "m"],
@@ -28,6 +29,9 @@ FEATURE_COLUMNS = {
     "tdta":   ["t", "dt", "a", "m"],
     "taw":    ["t", "a", "w", "m"],
     "tdtaw":  ["t", "dt", "a", "w", "m"],
+    "taE":    ["t", "a", "E", "m"],
+    "tdtaE":  ["t", "dt", "a", "E", "m"],
+    "tdtaEw": ["t", "dt", "a", "w", "E", "m"],
 }
 
 
@@ -35,11 +39,12 @@ def feature_dim(mode: str) -> int:
     return len(FEATURE_COLUMNS[mode])
 
 
-def assemble_features(t_bin, a, w, val, mode):
+def assemble_features(t_bin, a, w, val, mode, e=None):
     """Normalised feature columns for events already top-K & time-sorted.
 
-    t_bin, a, w, val: (..., K). Returns feat (..., K, F). Used at both train
+    t_bin, a, w, (e), val: (..., K). Returns feat (..., K, F). Used at both train
     (after top-K selection) and eval (extractor already returns top-K by time).
+    ``e`` (behind-energy, already in [0,1]) is required for modes using "E".
     """
     t_norm = t_bin / T
     w_norm = w / T
@@ -47,33 +52,36 @@ def assemble_features(t_bin, a, w, val, mode):
     t_first = t_bin[..., :1]                                  # earliest valid (slot 0)
     dt = torch.where(any_valid, (t_bin - t_first) / T, torch.zeros_like(t_bin))
     m = val.float()
-    t_norm, a, w_norm, dt = (x * m for x in (t_norm, a * m, w_norm, dt))
-    cols = {"t": t_norm, "dt": dt, "a": a, "w": w_norm, "m": m}
+    if e is None:
+        e = torch.zeros_like(t_bin)
+    t_norm, a, w_norm, dt, e = (x * m for x in (t_norm, a * m, w_norm, dt, e))
+    cols = {"t": t_norm, "dt": dt, "a": a, "w": w_norm, "E": e, "m": m}
     return torch.stack([cols[c] for c in FEATURE_COLUMNS[mode]], dim=-1)
 
 
-def select_topk(t_bin, a, w, valid, labels, k):
+def select_topk(t_bin, a, w, e, valid, labels, k):
     """Top-k by amplitude (nested under greedy-NMS height ranking), then sorted
-    chronologically (invalid pushed last). Returns t_bin,a,w,val,lab each (...,k)."""
+    chronologically (invalid pushed last). Returns t_bin,a,w,e,val,lab (...,k)."""
     score = torch.where(valid, a, torch.full_like(a, -1.0))
     idx = score.argsort(dim=-1, descending=True)[..., :k]
     g = lambda x: torch.gather(x, -1, idx)
-    t_bin, a, w, val, lab = g(t_bin), g(a), g(w), g(valid), g(labels)
+    t_bin, a, w, e, val, lab = g(t_bin), g(a), g(w), g(e), g(valid), g(labels)
     skey = torch.where(val, t_bin, torch.full_like(t_bin, T + 1.0))
     order = skey.argsort(dim=-1)
     g2 = lambda x: torch.gather(x, -1, order)
-    return g2(t_bin), g2(a), g2(w), g2(val), g2(lab)
+    return g2(t_bin), g2(a), g2(w), g2(e), g2(val), g2(lab)
 
 
 def build_features(events: torch.Tensor, valid: torch.Tensor, labels: torch.Tensor,
                    k: int, mode: str):
-    """events (..., 8, 3) [t_bin, a, w]; valid/labels (..., 8).
+    """events (..., 8, 4) [t_bin, a, w, E]; valid/labels (..., 8).
 
     Returns feat (..., k, F), lab (..., k) long, val (..., k) bool.
     """
-    t_bin, a, w, val, lab = select_topk(
-        events[..., 0], events[..., 1], events[..., 2], valid, labels, k)
-    feat = assemble_features(t_bin, a, w, val, mode)
+    e = events[..., 3] if events.shape[-1] > 3 else torch.zeros_like(events[..., 0])
+    t_bin, a, w, e, val, lab = select_topk(
+        events[..., 0], events[..., 1], events[..., 2], e, valid, labels, k)
+    feat = assemble_features(t_bin, a, w, val, mode, e=e)
     lab = torch.where(val, lab, torch.zeros_like(lab)).long()
     return feat, lab, val
 

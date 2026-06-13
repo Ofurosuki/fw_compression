@@ -34,7 +34,13 @@ def extract_frame_events(
     """vox_crop: raw (X, Y, T) float32 (already y/z cropped).
 
     Returns:
-        events: (X, Y, k, 3) float32 — columns ``[t_bin, a_height, w_fwhm_bin]``.
+        events: (X, Y, k, 4) float32 — columns ``[t_bin, a_height, w_fwhm_bin,
+            E_behind]``. ``E_behind`` = fraction of the (max-normalised) waveform
+            energy lying at/after the peak bin, ``sum(wn[t:]) / sum(wn)`` — a
+            full-waveform "transmitted-energy past this surface" cue that is NOT
+            derivable from the detected (t, a, w) events alone. The most
+            class-discriminative single feature found (glass|ghost AUC 0.93,
+            ghost|object 0.89); see FW_Event_Net/RESULTS.md.
         valid:  (X, Y, k) bool.
     Background pixels (max<=eps) yield all-invalid events.
     """
@@ -48,8 +54,16 @@ def extract_frame_events(
         min_distance=min_distance, intensity_mode="height")
     # kill events on background pixels
     vmask = vmask & valid_px[:, None]
+    # behind-energy per event: fraction of total energy at/after the peak bin
+    cs = torch.cumsum(wn, dim=1)                          # (N, T)
+    total = cs[:, -1:].clamp_min(eps)                     # (N, 1)
+    rows = torch.arange(wn.shape[0], device=wn.device)
+    t_idx = events[..., 0].long().clamp(0, T - 1)         # (N, k)
+    e_behind = (total - cs[rows[:, None], t_idx]) / total + wn[rows[:, None], t_idx] / total
+    e_behind = e_behind.clamp(0.0, 1.0)                  # (N, k); includes the peak bin
+    events = torch.cat([events, e_behind[..., None]], dim=-1)   # (N, k, 4)
     events[~vmask] = 0.0
-    events = events.reshape(X, Y, k, 3).cpu().numpy().astype(np.float32)
+    events = events.reshape(X, Y, k, 4).cpu().numpy().astype(np.float32)
     valid = vmask.reshape(X, Y, k).cpu().numpy()
     return events, valid
 

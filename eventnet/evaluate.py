@@ -34,7 +34,7 @@ from eventnet.data import assemble_features, feature_dim
 from eventnet.events import assign_labels, extract_frame_events
 from eventnet.metrics import (event_confusion, f1_from_cm, paint_pred_dense,
                               peak_cm_from_cache, peak_eval_frame)
-from eventnet.model import EventTensorNet
+from eventnet.model import build_model
 from eventnet.paths import NUM_CLASSES, T_CROPPED
 
 
@@ -43,12 +43,12 @@ def predict_frame(model, vox_crop, k, mode, device):
     """Extract top-K events and predict a class per event.
 
     Returns (t_bin, a, w, valid, pred) each (X, Y, K)."""
-    events, valid = extract_frame_events(vox_crop, device, k=k)   # (X,Y,K,3) sorted by t
+    events, valid = extract_frame_events(vox_crop, device, k=k)   # (X,Y,K,4) sorted by t
     ev = torch.from_numpy(events).to(device)
     val = torch.from_numpy(valid).to(device)
-    t_bin, a, w = ev[..., 0], ev[..., 1], ev[..., 2]
-    feat = assemble_features(t_bin, a, w, val, mode)              # (X,Y,K,F)
-    logits = model(feat.unsqueeze(0))[0]                          # (X,Y,K,C)
+    t_bin, a, w, e = ev[..., 0], ev[..., 1], ev[..., 2], ev[..., 3]
+    feat = assemble_features(t_bin, a, w, val, mode, e=e)         # (X,Y,K,F)
+    logits = model(feat.unsqueeze(0), val.unsqueeze(0))[0]        # (X,Y,K,C)
     pred = logits.argmax(-1)
     pred = torch.where(val, pred, torch.zeros_like(pred))
     return (t_bin.cpu().numpy(), a.cpu().numpy(), w.cpu().numpy(),
@@ -68,11 +68,13 @@ def main():
     ck = torch.load(args.checkpoint, map_location="cpu", weights_only=False)
     ca = ck["args"]
     K, mode = ca["K"], ca["feature_mode"]
-    model = EventTensorNet(K=K, in_dim=feature_dim(mode), emb_dim=ca["emb_dim"],
-                           num_classes=NUM_CLASSES, base_channels=ca["base_channels"])
+    model = build_model(ca.get("arch", "v1"), K=K, in_dim=feature_dim(mode),
+                        num_classes=NUM_CLASSES, emb_dim=(ca.get("emb_dim") or None),
+                        base_channels=ca["base_channels"], attn_heads=ca.get("attn_heads", 4),
+                        attn_layers=ca.get("attn_layers", 2), unet_levels=ca.get("unet_levels", 3))
     model.load_state_dict(ck["state_dict"])
     model.eval().to(device)
-    print(f"[eval] {mode} K={K}  val_f1={ck.get('val_f1_mean'):.4f}")
+    print(f"[eval] arch={ca.get('arch','v1')} {mode} K={K}  val_f1={ck.get('val_f1_mean'):.4f}")
 
     frames = paths.list_frames("test", frame_stride=args.frame_stride)
     if args.limit:

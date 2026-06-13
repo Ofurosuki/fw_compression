@@ -219,6 +219,79 @@ lets the network **learn** the ray relations instead (`eventnet/model.py`,
 
 ---
 
+## V3 — adding a decomposed direct/indirect transport channel — negative result
+
+Motivated by the behind-energy lit-review (`papers/benind_energy_deepresearch.pdf`),
+which argues the event list discards the broad **indirect/volume** term `d(r)` that
+should separate glass (real surface *behind*) from ghost (indirect/global return).
+We Gaussian-reconstruct the detected peaks `dir(r)=Σaₖ·exp(-(r-tₖ)²/2σ²)`, take the
+residual `resid(r)=max(0, wn-dir)`, and attach per-event channels (`eventnet/events.py`,
+now 7-col cache): `D_after` (direct mass behind → glass cue), `I_after` (indirect/diffuse
+mass behind → ghost cue, the genuinely *new* info), `I_local` (diffuse pedestal).
+
+The decomposition is physically clean at the **feature** level (per-class medians):
+`D_after` glass **0.82** / object 0.50 / ghost **0.07**; `I_after` is small (this
+dataset's ghosts are discrete secondary peaks, not diffuse tails).
+
+### Ablation (paper peak-level F1, K=4, seed 42, **same cache** = clean within-run control)
+| mode | object | glass | ghost | **F1-mean** | vs in-run `taw` |
+|---|--:|--:|--:|--:|--:|
+| **taw** (control) | 0.748 | 0.262 | 0.599 | **0.536** | — |
+| tawD (+`D`) | 0.746 | 0.228 | 0.525 | **0.500** | −0.036 |
+| tawI (+`I`) | 0.745 | 0.234 | 0.584 | **0.521** | −0.015 |
+| tawi (+`D,I,L`) | 0.750 | 0.261 | 0.594 | **0.535** | −0.001 |
+
+**Verdict: the decomposition channels do NOT help.** `tawD`/`tawI` hurt, `tawi` ties.
+**Glass — the target — did not move** (taw 0.262, all variants ≤0.262), even though
+`D_after` separates glass cleanly in isolation. This is the **third repeat** of the
+"separable-but-not-transferable" pattern (width → behind_energy → decomposition):
+- `D_after` is largely *derivable* from the events the attention net already sees
+  (direct-peak mass after tₖ), so it adds optimization noise, not information.
+- `D_after`/`I_after` are integrals-after-the-peak → still **depth/scene-confounded**
+  (where the surface-behind sits is scene geometry), so they don't transfer to the 3
+  held-out scenes — exactly the lit-review's warning that *raw* decomposed scalars are
+  "the least-processed form" and need radiometric/range invariance first, not bolting on.
+
+(Note: the in-run `taw` here is 0.536 vs 0.565 for the *same* taw/seed42/V2 on the prior
+4-col cache — a 0.029 swing from re-cache/run variance, re-confirming the ±0.03 noise band.
+The clean comparison is *within* this run, where the control is taw 0.536.)
+
+**Implication for the FWL-ToPM gap:** the indirect-channel route did not unlock glass, so
+this feature-engineering path does not close the 0.555→0.599 gap. The remaining levers from
+the lit-review are bigger lifts: (i) radiometric/range/incidence correction *before*
+features, (ii) a fundamentally different rep (transient-NeRF density/transmittance) rather
+than a peak list + bolt-on scalars.
+
+### Would radiometric/range correction rescue the glass cue? No (cheap diagnostic)
+We tested lever (i) without training: range-correct the per-event amplitude to a material
+backscatter proxy `ρ = a·R(t)²` (R∝t+c0, the cheap range-only part; incidence-angle needs
+surface normals we don't have) and re-measure the per-scene glass-vs-object signed AUC. The
+physical hypothesis is that glass, being partially transmissive, should have a **consistently
+lower material backscatter** (signed AUC <0.5 in *every* scene).
+
+| | per-scene signed AUC (>0.5 = glass brighter) |
+|---|---|
+| raw `a` | mean 0.59, range [0.47, 0.68], <0.5 in 1/9 |
+| `ρ=a·R²` (c0=25/125/325) | mean ~0.43, range **[0.22, 0.69], sign flips (5/9 <0.5, 4/9 >0.5)** |
+| `ρ` depth-stratified | mean 0.53, still flips (4/9 <0.5) |
+
+**Negative, and robust to the unknown range zero-point c0.** Range correction does NOT make
+the glass cue scene-consistent — it *widens* the spread. Why: (1) we already per-pixel
+max-normalize, so absolute 1/R² attenuation is largely gone; ×R² with an unknown zero-point
+*injects* a range distortion rather than removing one. (2) The sign-flip scenes (gym_build,
+14build_7floor) are exactly those where glass sits *farther* than object, so ×R² over-boosts
+far glass and *amplifies* the flip — confirming the confound is the *relative near/far
+geometry*, not radiometric range alone. (3) incidence-angle + material are uncorrected (Janda
+CRV2023: waveform depends on distance AND angle AND material).
+
+**Conclusion: feature engineering for glass is exhausted** (width → behind_energy →
+decomposition → radiometric correction all fail to transfer). The glass ceiling is a
+representation / domain-gap problem, not a feature problem. Real remaining levers: a
+range-decoupled representation (transient-NeRF density/transmittance), or domain-generalization
+training (scene-as-environment group DRO / V-REx to close the val 0.70 vs test 0.55 gap).
+
+---
+
 ## Follow-up: behind-energy (a transmitted-energy feature) — negative result
 
 Motivated by "width doesn't help — what *waveform* feature actually separates the

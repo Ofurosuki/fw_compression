@@ -43,14 +43,14 @@ def predict_frame(model, vox_crop, k, mode, device):
     """Extract top-K events and predict a class per event.
 
     Returns (t_bin, a, w, valid, pred) each (X, Y, K)."""
-    events, valid = extract_frame_events(vox_crop, device, k=k)   # (X,Y,K,4) sorted by t
+    events, valid = extract_frame_events(vox_crop, device, k=k)   # (X,Y,K,7) sorted by t
     ev = torch.from_numpy(events).to(device)
     val = torch.from_numpy(valid).to(device)
-    t_bin, a, w, e = ev[..., 0], ev[..., 1], ev[..., 2], ev[..., 3]
-    feat = assemble_features(t_bin, a, w, val, mode, e=e)         # (X,Y,K,F)
+    feat = assemble_features(ev, val, mode)                       # (X,Y,K,F)
     logits = model(feat.unsqueeze(0), val.unsqueeze(0))[0]        # (X,Y,K,C)
     pred = logits.argmax(-1)
     pred = torch.where(val, pred, torch.zeros_like(pred))
+    t_bin, a, w = ev[..., 0], ev[..., 1], ev[..., 2]
     return (t_bin.cpu().numpy(), a.cpu().numpy(), w.cpu().numpy(),
             valid, pred.cpu().numpy())
 

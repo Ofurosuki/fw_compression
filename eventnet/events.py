@@ -34,14 +34,24 @@ def extract_frame_events(
     """vox_crop: raw (X, Y, T) float32 (already y/z cropped).
 
     Returns:
-        events: (X, Y, k, 4) float32 — columns ``[t_bin, a_height, w_fwhm_bin,
-            E_behind]``. ``E_behind`` = fraction of the (max-normalised) waveform
-            energy lying at/after the peak bin, ``sum(wn[t:]) / sum(wn)`` — a
-            full-waveform "transmitted-energy past this surface" cue that is NOT
-            derivable from the detected (t, a, w) events alone. The most
-            class-discriminative single feature found (glass|ghost AUC 0.93,
-            ghost|object 0.89); see FW_Event_Net/RESULTS.md.
+        events: (X, Y, k, 7) float32 — columns
+            ``[t_bin, a_height, w_fwhm_bin, E_behind, D_after, I_after, I_local]``.
         valid:  (X, Y, k) bool.
+
+    Beyond (t, a, w) we attach a **direct/indirect waveform decomposition** (the
+    lit-review insight, FW_Event_Net/RESULTS.md "behind-energy"): reconstruct the
+    DIRECT model as a sum of Gaussians at the detected peaks
+    ``dir(r)=Σ a_k·exp(-(r-t_k)²/2σ_k²)`` (σ=FWHM/2.3548), and the INDIRECT/diffuse
+    residual ``resid(r)=max(0, wn-dir)`` — the part the top-K event list throws
+    away. Per event (fractions of total energy, ∈[0,1]):
+      * ``E_behind`` = total energy at/after the peak (raw transmitted-energy;
+        found depth-confounded & scene-non-transferable — kept for ablation).
+      * ``D_after``  = DIRECT mass strictly after the peak → "is a real surface
+        behind me" (glass cue; largely derivable from the events, control arm).
+      * ``I_after``  = INDIRECT/diffuse mass after the peak → broad-transport-behind
+        (ghost/multipath cue; the genuinely NEW info not in (t,a,w)).
+      * ``I_local``  = diffuse pedestal within ±15 bins of the peak (is this return
+        itself sitting on volume/indirect transport).
     Background pixels (max<=eps) yield all-invalid events.
     """
     X, Y, T = vox_crop.shape
@@ -52,18 +62,40 @@ def extract_frame_events(
     events, vmask = extract_topk_events_batch(
         wn, k, smooth_sigma=smooth_sigma, min_height=min_height,
         min_distance=min_distance, intensity_mode="height")
-    # kill events on background pixels
-    vmask = vmask & valid_px[:, None]
-    # behind-energy per event: fraction of total energy at/after the peak bin
+    vmask = vmask & valid_px[:, None]                    # kill background pixels
+
+    N = wn.shape[0]
+    rows = torch.arange(N, device=wn.device)
+    t_idx = events[..., 0].long().clamp(0, T - 1)        # (N, k)
     cs = torch.cumsum(wn, dim=1)                          # (N, T)
     total = cs[:, -1:].clamp_min(eps)                     # (N, 1)
-    rows = torch.arange(wn.shape[0], device=wn.device)
-    t_idx = events[..., 0].long().clamp(0, T - 1)         # (N, k)
-    e_behind = (total - cs[rows[:, None], t_idx]) / total + wn[rows[:, None], t_idx] / total
-    e_behind = e_behind.clamp(0.0, 1.0)                  # (N, k); includes the peak bin
-    events = torch.cat([events, e_behind[..., None]], dim=-1)   # (N, k, 4)
+    e_behind = ((total - cs[rows[:, None], t_idx]) / total
+                + wn[rows[:, None], t_idx] / total).clamp(0.0, 1.0)
+
+    # direct/indirect decomposition: Gaussian-reconstruct the detected peaks
+    rr = torch.arange(T, device=wn.device, dtype=wn.dtype)            # (T,)
+    sig = (events[..., 2] / 2.3548).clamp_min(0.5)                    # (N, k) FWHM->sigma
+    direct = torch.zeros_like(wn)                                     # (N, T)
+    for j in range(k):
+        vj = vmask[:, j]
+        g = events[:, j, 1:2] * torch.exp(
+            -((rr[None, :] - events[:, j, 0:1]) ** 2) / (2.0 * sig[:, j:j+1] ** 2))
+        direct = direct + torch.where(vj[:, None], g, torch.zeros_like(g))
+    resid = (wn - direct).clamp_min(0.0)                             # (N, T) indirect/diffuse
+    cs_dir = torch.cumsum(direct, dim=1)
+    cs_res = torch.cumsum(resid, dim=1)
+    g = lambda cs_, idx: cs_[rows[:, None], idx]
+    d_after = ((cs_dir[:, -1:] - g(cs_dir, t_idx)) / total).clamp(0.0, 1.0)   # (N,k)
+    i_after = ((cs_res[:, -1:] - g(cs_res, t_idx)) / total).clamp(0.0, 1.0)
+    Wl = 15
+    lo = (t_idx - Wl).clamp(0, T - 1)
+    hi = (t_idx + Wl).clamp(0, T - 1)
+    i_local = ((g(cs_res, hi) - g(cs_res, lo)) / total).clamp(0.0, 1.0)
+
+    extra = torch.stack([e_behind, d_after, i_after, i_local], dim=-1)   # (N, k, 4)
+    events = torch.cat([events, extra], dim=-1)                          # (N, k, 7)
     events[~vmask] = 0.0
-    events = events.reshape(X, Y, k, 4).cpu().numpy().astype(np.float32)
+    events = events.reshape(X, Y, k, 7).cpu().numpy().astype(np.float32)
     valid = vmask.reshape(X, Y, k).cpu().numpy()
     return events, valid
 

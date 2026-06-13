@@ -41,7 +41,7 @@ def main():
     ap.add_argument("--K", type=int, default=4)
     ap.add_argument("--feature_mode", default="tdtaw",
                     choices=["t_only", "t_dt", "ta", "tdta", "taw", "tdtaw",
-                             "taE", "tdtaE", "tdtaEw"])
+                             "taE", "tdtaE", "tdtaEw", "tawD", "tawI", "tawi"])
     ap.add_argument("--frame_stride", type=int, default=7)
     ap.add_argument("--batch_size", type=int, default=8)
     ap.add_argument("--epochs", type=int, default=40)

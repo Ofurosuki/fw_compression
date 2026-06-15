@@ -15,6 +15,29 @@ population as the paper's "F1-mean". Detailed write-ups: `RESULTS.md`; per-scene
 - object already **beats** the full-waveform model (0.75 vs 0.742); glass is the gap (≈0.31
   vs 0.385) and is a **representation/domain-gap** problem (see "Lessons").
 
+## Inference speed (cuda:2 ~Blackwell, B=1, fp32; warmup + timed iters + CUDA-sync)
+| config | input | params | ms/fwd | FPS |
+|---|---|--:|--:|--:|
+| FWL-ToPM (full-waveform) | crop 300×168×200 (ToMe-pruned) | 8.72 M | 9.8 | 102 |
+| V2 `taw` forward | full 400×336×K4×F4 | 7.85 M | 15.6 | 64 |
+| V2 event extraction (taw, bare) | raw → events | — | 10 | 100 |
+| **V2 `taw` end-to-end** (extract+fwd) | raw → logits | 7.85 M | **25.6** | **39** |
+
+- Per-forward ToPM is ~1.6× faster, but on **43 % the coverage** (a 200×168 crop vs V2's full
+  400×336 plane); ToPM is fast because ToMe token-merge + intensity-pruning shrink its input.
+- **At equal full-frame coverage they're comparable** (~24 ms each: ToPM ~2.4 crops; V2 25.6 ms
+  full plane). V2 end-to-end ≈ **39 FPS**, real-time-capable.
+- **The compression win is bandwidth/data-size (>100×), NOT a speed win** — inference speeds
+  are the same order. (V3/V4 12-col decomposition extraction is 394 ms; `taw` needs only the
+  10 ms bare extraction.)
+- **V2 forward breakdown** (params ≠ latency): cross-event attention **11.6 ms / 75 %** (≈0
+  params, but runs on B·H·W = 134k per-pixel sequences of length K=4 → memory/launch-bound,
+  low GPU utilization), U-Net 3.2 ms / 21 % (holds most params but compute-dense → fast),
+  event-MLP 0.7 ms. → V2 is "slow for its param count" because the bottleneck is the
+  near-param-free per-pixel attention; optimizing it (lighter relational op / fp16 /
+  fewer heads) could cut forward toward ~5 ms. ToPM is param-heavy but fast because ToMe
+  merge+prune shrink its effective token count.
+
 ---
 
 ## Master results table
@@ -67,10 +90,14 @@ scenes incl. a train scene) → no per-ray scalar/shape summary transfers. (`SCE
 | **loss: focal (γ=2)** | seed42 | F1 0.535, glass 0.296 | same trade as class-weight |
 
 ### E. Architecture: spatial attention (`v2sa`, +1.06 M)
-| run | recipe | F1 (2-seed) | glass | status |
+| run | recipe | F1 (2-seed) | ghost | verdict |
 |---|---|--:|--:|---|
-| v2sa initial | bolt-on (lr1e-3, no warmup, 40ep) | 0.523 | 0.201 | **inconclusive** — *under-trained* (val also ↓, not overfit) |
-| v2sa retest | improved (lr5e-4, warmup5, 50ep) | — | — | **in progress** (GPU-2 only; base ctrl 0.529/0.275 done) |
+| v2sa initial | bolt-on (lr1e-3, no warmup, 40ep) | 0.523 | 0.201 | artifact — *under-trained* (val also ↓, not overfit) |
+| base (fair) | lr5e-4, warmup5, 50ep | 0.536 | 0.583 | control |
+| **v2sa (fair)** | lr5e-4, warmup5, 50ep | **0.541** | 0.612 | **neutral** — ΔF1 +0.005, sign-flips per-seed (+0.029/−0.019); seed-42 ghost +0.08 did NOT replicate (s43 −0.022) |
+
+→ fair recipe resolves the under-training (v2sa val ≈ base), but v2sa **≈ base on test** (seed-
+dependent, within ±0.03). Spatial attention is **neutral**, not a headline. F1-mean 0.541 < ToPM 0.599.
 
 ---
 
@@ -84,7 +111,7 @@ scenes incl. a train scene) → no per-ray scalar/shape summary transfers. (`SCE
 7. **V4 NeRF transmittance profile** → no transfer (shape flips on same scenes).
 8. **V-REx DG** → ≈ ERM.
 9. **loss sweep (glass-weight / focal)** → moves glass but precision/recall trade; F1 flat, not seed-robust.
-10. **spatial attention** → first run inconclusive (under-trained); fair retest **running**.
+10. **spatial attention** → first run was under-training artifact; **fair-recipe 2-seed = neutral** (ΔF1 +0.005, seed-flipping; seed-42 ghost +0.08 didn't replicate). Not a headline.
 
 ---
 

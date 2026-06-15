@@ -14,6 +14,25 @@
 - object はすでに full-waveform を**上回る**（0.75 vs 0.742）。残る差は glass（≈0.31 vs 0.385）で、
   これは **表現/ドメインギャップ** の問題（「教訓」参照）。
 
+## 推論速度（cuda:2 ~Blackwell、B=1、fp32；warmup + 計測 iters + CUDA同期）
+| 構成 | 入力 | params | ms/fwd | FPS |
+|---|---|--:|--:|--:|
+| FWL-ToPM（full-waveform） | crop 300×168×200（ToMe枝刈り後） | 8.72 M | 9.8 | 102 |
+| V2 `taw` forward | full 400×336×K4×F4 | 7.85 M | 15.6 | 64 |
+| V2 イベント抽出（taw, bare） | raw → events | — | 10 | 100 |
+| **V2 `taw` end-to-end**（抽出+fwd） | raw → logits | 7.85 M | **25.6** | **39** |
+
+- forward 単体は ToPM が ~1.6× 速いが、**カバー範囲は 43%**（200×168 crop vs V2 は全 400×336 面）。
+  ToPM は ToMe トークン併合 + 強度枝刈りで実効入力が小さく速い。
+- **全フレーム同一カバーなら同等**（各 ~24 ms：ToPM は ~2.4 crops、V2 は 25.6 ms で全面）。V2 end-to-end ≈ **39 FPS** で実時間可。
+- **圧縮の利点は帯域/データ量（>100×）であって速度ではない** — 推論速度は同オーダー。
+  （V3/V4 の 12 列分解抽出は 394 ms だが、`taw` は 10 ms の bare 抽出のみで足りる。）
+- **V2 forward 内訳**（パラメータ≠レイテンシ）：cross-event attention **11.6 ms / 75%**（ほぼ無パラだが
+  B·H·W = 13.4万本の per-pixel × K=4 シーケンス → memory/launch-bound・低稼働率）、U-Net 3.2 ms / 21%
+  （パラの大半を持つが計算密度高く高速）、event-MLP 0.7 ms。→「パラの割に遅い」のは**ボトルネックが
+  ほぼ無パラの per-pixel attention** だから。ここを軽くすれば（軽い関係演算/fp16/ヘッド削減）forward は
+  ~5 ms まで縮みうる。ToPM はパラ多いが ToMe 併合+枝刈りで実効トークンが減るので速い。
+
 ---
 
 ## マスター結果表
@@ -65,10 +84,14 @@ K スイープ（tdtaw）：K1 **0.357**（ghost 0.058!）、K2 0.497、**K4 0.5
 | **損失: focal (γ=2)** | seed42 | F1 0.535、glass 0.296 | class-weight と同じトレード |
 
 ### E. アーキテクチャ: spatial attention（`v2sa`、+1.06 M）
-| run | レシピ | F1 (2-seed) | glass | 状態 |
+| run | レシピ | F1 (2-seed) | ghost | 判定 |
 |---|---|--:|--:|---|
-| v2sa 初回 | 後付け（lr1e-3、warmup なし、40ep） | 0.523 | 0.201 | **inconclusive** — *under-training*（val も↓、過学習ではない） |
-| v2sa 再検証 | 改良（lr5e-4、warmup5、50ep） | — | — | **進行中**（GPU-2 のみ；base control 0.529/0.275 完了） |
+| v2sa 初回 | 後付け（lr1e-3、warmup なし、40ep） | 0.523 | 0.201 | 人工物 — *under-training*（val も↓、過学習ではない） |
+| base（公正） | lr5e-4、warmup5、50ep | 0.536 | 0.583 | control |
+| **v2sa（公正）** | lr5e-4、warmup5、50ep | **0.541** | 0.612 | **中立** — ΔF1 +0.005、per-seed 符号反転（+0.029/−0.019）；seed42 の ghost +0.08 は再現せず（s43 −0.022） |
+
+→ 公正レシピで under-training は解消（v2sa val ≈ base）するが、test では v2sa **≈ base**（seed 依存、±0.03 内）。
+spatial attention は**中立**でヘッドラインではない。F1-mean 0.541 < ToPM 0.599。
 
 ---
 
@@ -82,7 +105,7 @@ K スイープ（tdtaw）：K1 **0.357**（ghost 0.058!）、K2 0.497、**K4 0.5
 7. **V4 NeRF 透過率プロファイル** → 転移せず（同じシーンで形状反転）。
 8. **V-REx DG** → ≈ ERM。
 9. **損失スイープ（glass-weight / focal）** → glass は動くが precision/recall トレード；F1 横ばい・seed非頑健。
-10. **spatial attention** → 初回 inconclusive（under-training）；公正な再検証 **実行中**。
+10. **spatial attention** → 初回は under-training 人工物；**公正レシピ 2-seed = 中立**（ΔF1 +0.005、seed反転；seed42 の ghost +0.08 は非再現）。ヘッドラインにならず。
 
 ---
 

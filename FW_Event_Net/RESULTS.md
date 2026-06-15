@@ -335,29 +335,31 @@ down) that leaves F1-mean flat, and the gain is **not seed-robust**: glass×1.5 
 +0.034 (seed 42) but +0.002 (seed 43), 2-seed mean +0.018 (≈ noise). So loss tuning
 redistributes between classes but does not lift the headline.
 
-### (2) Spatial attention at the U-Net bottleneck (`v2sa`, +1.06 M params) — INCONCLUSIVE
-| cfg | val_F1 | val_glass | test_F1 | test_glass |
-|---|--:|--:|--:|--:|
-| base (v2) s42/s43 | 0.698 / 0.698 | 0.542 / 0.546 | 0.536 / 0.531 | 0.266 / 0.269 |
-| v2sa s42/s43 | 0.662 / 0.671 | 0.491 / 0.509 | 0.516 / 0.529 | **0.155 / 0.247** |
+### (2) Spatial attention at the U-Net bottleneck (`v2sa`, +1.06 M params) — neutral
+Two phases. **(a) bolt-on recipe** (LR 1e-3 flat, no warmup, 40ep): v2sa was lower on **test
+AND val** → *under-trained / unstable*, NOT a clean negative (an earlier draft wrongly called
+this "cross-scene overfit"; val refutes that). **(b) fair recipe** (LR 5e-4, warmup 5, 50ep,
+applied to both base and v2sa so only the attention module differs):
 
-v2sa is lower than base on **test AND val** (val_F1 0.67 vs 0.70, val_glass 0.50 vs 0.54).
-**This is NOT overfitting** (overfit = val↑/test↓); v2sa fits even the *training* scenes worse
-→ it is **under-trained / unstable**, not "attention is bad for generalization." Cause:
-spatial attention was bolted onto the unchanged CNN recipe (LR 1e-3 flat-cosine, no warmup,
-BatchNorm, 40 ep); attention modules typically need LR warmup / lower LR / norm-first, and the
-large test-glass seed spread (0.155 vs 0.247) is a training-instability signature. **So the
-spatial-attention result is inconclusive** — a fair test needs attention-appropriate training
-(warmup + lower/decoupled LR, more epochs, GroupNorm). *(Correction: an earlier version of this
-section wrongly called this a "cross-scene overfit"; the val numbers refute that.)*
+| fair recipe, 2-seed | val_F1 | test_F1 | glass | ghost | per-seed test_F1 | per-seed ghost |
+|---|--:|--:|--:|--:|--|--|
+| base (v2) | 0.703 | 0.536 | 0.275 | 0.583 | 0.529 / 0.543 | 0.567 / 0.599 |
+| v2sa | 0.705 | 0.541 | 0.260 | 0.612 | 0.557 / 0.524 | 0.647 / 0.577 |
 
-**Verdict:** of the two glass-targeted levers, loss-tuning only **trades classes** (F1 flat,
-not seed-robust) and spatial-attention (as trained) is **inconclusive (under-trained)**. Net:
-no architecture/training change *robustly lifts* the held-out headline yet, but — unlike the
-representation/feature experiments — these are **not clean negatives**; the arch/training space
-is genuinely under-explored (attention needs proper training; EMA/aug/backbone untried). So
-"is the current architecture best?" → **no, and it remains the most plausible under-tested
-lever**, but a fair attempt requires training recipes matched to the new modules.
+The fair recipe **resolves the under-training** (v2sa val_F1 0.705 ≈ base 0.703 — confirming
+phase (a) was an artifact). But on test, **v2sa ≈ base: ΔF1 +0.005 (within ±0.03), and both
+ΔF1 and Δghost SIGN-FLIP across seeds** (ΔF1 +0.029/−0.019; Δghost +0.079/−0.022). The eye-
+catching seed-42 ghost spike (+0.08) **did not replicate** at seed-43 (−0.022). So spatial
+attention is **neutral**, not a real gain — a textbook single-seed fluctuation, exactly the
+±0.03 trap. v2sa F1-mean 0.541 < FWL-ToPM 0.599.
+
+**Verdict:** both glass-targeted arch/training levers fail to robustly lift the held-out
+headline — loss-tuning **trades classes** (F1 flat), spatial-attention is **neutral** (seed-
+flipping; under-training was the only real phase-(a) effect, now fixed). So "is the current
+architecture best?" → not provably, but **no tested architecture/training change beats it
+robustly** either. Glass stays the gap (ours ~0.27 vs ToPM 0.385); it is a representation
+problem, not closed by capacity. *(Methodological note: the seed-42 → seed-43 reversal is why
+2-seed confirmation is mandatory; single-run +0.03 deltas are noise.)*
 Headline unchanged: **V2 `taw` ≈ 0.55 ± 0.03**. (Caveat: this is a 2-lever probe, not an
 exhaustive NAS; untried knobs like EMA/stronger-aug/different backbone exist, but both
 glass-targeted attempts failed and the capacity-hurts result argues against scaling up.)

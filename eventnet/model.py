@@ -116,9 +116,13 @@ class CrossEventAttention(nn.Module):
 
 
 class UNet2D(nn.Module):
-    """U-Net with a configurable number of 2x downsampling levels."""
+    """U-Net with a configurable number of 2x downsampling levels, optionally with
+    a global SPATIAL self-attention block at the bottleneck (every coarse-grid cell
+    attends to every other) — gives the planar/extended glass class large-receptive-
+    field context the conv stack lacks. ``spatial_attn`` enables it."""
 
-    def __init__(self, in_channels, out_channels, base_channels=64, levels=3):
+    def __init__(self, in_channels, out_channels, base_channels=64, levels=3,
+                 spatial_attn=False, sa_heads=8):
         super().__init__()
         self.levels = levels
         self.encs = nn.ModuleList()
@@ -131,10 +135,15 @@ class UNet2D(nn.Module):
             self.pools.append(nn.MaxPool2d(2))
             chans.append(oc)
             ch = oc
-        self.bottleneck = ConvBlock(ch, base_channels * (2 ** levels))
+        bc0 = base_channels * (2 ** levels)
+        self.bottleneck = ConvBlock(ch, bc0)
+        self.spatial_attn = spatial_attn
+        if spatial_attn:
+            self.sa_norm = nn.LayerNorm(bc0)
+            self.sa = nn.MultiheadAttention(bc0, sa_heads, batch_first=True)
         self.ups = nn.ModuleList()
         self.decs = nn.ModuleList()
-        bc = base_channels * (2 ** levels)
+        bc = bc0
         for l in reversed(range(levels)):
             oc = chans[l]
             self.ups.append(nn.ConvTranspose2d(bc, oc, 2, stride=2))
@@ -150,6 +159,12 @@ class UNet2D(nn.Module):
             skips.append(h)
             h = pool(h)
         h = self.bottleneck(h)
+        if self.spatial_attn:                          # global spatial self-attention
+            B, C, hh, ww = h.shape
+            t = h.flatten(2).transpose(1, 2)           # (B, hh*ww, C)
+            tn = self.sa_norm(t)
+            t = t + self.sa(tn, tn, tn, need_weights=False)[0]
+            h = t.transpose(1, 2).reshape(B, C, hh, ww)
         for up, dec, skip in zip(self.ups, self.decs, reversed(skips)):
             h = dec(torch.cat([up(h), skip], dim=1))
         return self.out(h)
@@ -159,7 +174,7 @@ class EventTensorNetV2(nn.Module):
     """Event MLP + rank embedding -> cross-event attention -> deeper 2D U-Net."""
 
     def __init__(self, K, in_dim=5, emb_dim=48, num_classes=4, base_channels=64,
-                 attn_heads=4, attn_layers=2, unet_levels=3):
+                 attn_heads=4, attn_layers=2, unet_levels=3, spatial_attn=False):
         super().__init__()
         self.K = K
         self.emb_dim = emb_dim
@@ -171,7 +186,8 @@ class EventTensorNetV2(nn.Module):
         )
         self.rank_embedding = nn.Embedding(K, emb_dim)
         self.cross_event = CrossEventAttention(emb_dim, attn_heads, attn_layers)
-        self.spatial_net = UNet2D(K * emb_dim, K * num_classes, base_channels, levels=unet_levels)
+        self.spatial_net = UNet2D(K * emb_dim, K * num_classes, base_channels,
+                                  levels=unet_levels, spatial_attn=spatial_attn)
 
     def forward(self, events, valid):
         """events: [B,H,W,K,F], valid: [B,H,W,K] bool -> logits [B,H,W,K,C]."""
@@ -195,15 +211,16 @@ class EventTensorNetV2(nn.Module):
 
 
 def build_model(arch, K, in_dim, num_classes=4, emb_dim=None, base_channels=64,
-                attn_heads=4, attn_layers=2, unet_levels=3):
+                attn_heads=4, attn_layers=2, unet_levels=3, spatial_attn=False):
     if arch == "v1":
         return EventTensorNet(K, in_dim=in_dim, emb_dim=emb_dim or 32,
                               num_classes=num_classes, base_channels=base_channels)
-    if arch == "v2":
+    if arch in ("v2", "v2sa"):
         return EventTensorNetV2(K, in_dim=in_dim, emb_dim=emb_dim or 48,
                                 num_classes=num_classes, base_channels=base_channels,
                                 attn_heads=attn_heads, attn_layers=attn_layers,
-                                unet_levels=unet_levels)
+                                unet_levels=unet_levels,
+                                spatial_attn=spatial_attn or arch == "v2sa")
     raise ValueError(arch)
 
 

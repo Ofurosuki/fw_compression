@@ -21,7 +21,9 @@ from eventnet.cache_events import cache_path
 T = float(paths.T_CROPPED)
 
 # cached event columns (see eventnet/events.py)
-EVENT_COLS = {"t": 0, "a": 1, "w": 2, "E": 3, "D": 4, "I": 5, "L": 6}
+EVENT_COLS = {"t": 0, "a": 1, "w": 2, "E": 3, "D": 4, "I": 5, "L": 6,
+              "Tp0": 7, "Tp8": 8, "Tp16": 9, "Tp32": 10, "Tp64": 11}
+TP_COLS = ["Tp0", "Tp8", "Tp16", "Tp32", "Tp64"]  # NeRF transmittance decay profile
 
 # columns each mode feeds the shared event MLP (m = valid mask is always last).
 # E=raw behind-energy; D=direct mass behind (glass cue); I=indirect/diffuse mass
@@ -40,6 +42,9 @@ FEATURE_COLUMNS = {
     "tawD":   ["t", "a", "w", "D", "m"],            # + direct-behind (control)
     "tawI":   ["t", "a", "w", "I", "m"],            # + indirect-behind (new info)
     "tawi":   ["t", "a", "w", "D", "I", "L", "m"],  # + full decomposition
+    # V4a: taw + NeRF-style peak-anchored transmittance decay profile
+    "tawT":   ["t", "a", "w"] + TP_COLS + ["m"],    # + T(peak+δ) survival samples
+    "tT":     ["t"] + TP_COLS + ["m"],              # transmittance-only (no a,w) probe
 }
 
 
@@ -66,6 +71,8 @@ def assemble_features(ev, val, mode):
         "D": ev[..., EVENT_COLS["D"]], "I": ev[..., EVENT_COLS["I"]],
         "L": ev[..., EVENT_COLS["L"]],
     }
+    for c in TP_COLS:                       # NeRF transmittance profile (already [0,1])
+        raw[c] = ev[..., EVENT_COLS[c]]
     cols = {k: v * m for k, v in raw.items()}
     cols["m"] = m
     return torch.stack([cols[c] for c in FEATURE_COLUMNS[mode]], dim=-1)
@@ -114,6 +121,10 @@ class EventFrameDataset(Dataset):
         if not self.files:
             raise FileNotFoundError(f"no cached frames in {self.dir}; run cache_events first")
         self.k, self.mode, self.crop, self.augment = k, mode, crop, augment
+        # scene id per frame (filename = "{scene}__{hist}__{stem}.npz") for DG/V-REx
+        self.scenes = [os.path.basename(f).split("__")[0] for f in self.files]
+        self.scene_list = sorted(set(self.scenes))
+        self.scene_to_id = {s: i for i, s in enumerate(self.scene_list)}
 
     def __len__(self):
         return len(self.files)
@@ -140,4 +151,5 @@ class EventFrameDataset(Dataset):
                 events, valid, labels = events.flip(1), valid.flip(1), labels.flip(1)
 
         feat, lab, val = build_features(events, valid, labels, self.k, self.mode)
-        return {"events": feat, "labels": lab, "valid": val}
+        return {"events": feat, "labels": lab, "valid": val,
+                "scene": self.scene_to_id[self.scenes[i]]}

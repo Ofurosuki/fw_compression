@@ -1,5 +1,8 @@
 # FW Event-Tensor Net — results
 
+> One-page experiment ledger (V1→present, all configs + verdicts): **FW_Event_Net/EXPERIMENT_LOG.md** (日本語: **EXPERIMENT_LOG.ja.md**).
+> Per-scene geometric distributions of object/glass/ghost (depths, behind-energy, transmittance, radiometric AUC per scene) are consolidated in **FW_Event_Net/SCENE_GEOMETRY.md** (日本語版: **SCENE_GEOMETRY.ja.md**).
+
 A **trained-from-scratch** network that takes the sparse top-K transport-event
 tensor `{(t, Δt, a, w, m)}` as input (replacing the dense `T=700` waveform) and
 segments each event into `{noise, object, glass, ghost}`. Unlike the rest of
@@ -216,6 +219,148 @@ lets the network **learn** the ray relations instead (`eventnet/model.py`,
 - Variance: cross-scene test range up to 0.033 at near-identical val F1
   (~0.68–0.70; val=7 train scenes, test=3 held-out), so single-seed deltas <0.03
   are noise — which is why the 2-seed averaging above was necessary.
+
+---
+
+## Domain-generalization training (V-REx) — does not beat ERM
+
+Since the glass ceiling is a representation/domain-gap problem, not a feature problem, we
+tried the *training-side* lever: leave the representation (`taw`) and model (V2) unchanged and
+change only the **objective** to a domain-generalization loss. The split *is* a DG problem
+(train 7 scenes → test 3 unseen; val 0.70 vs test 0.55 gap). We treat each **scene as an
+environment** and use **V-REx** (Krueger 2021): `loss = ERM + β·Var(per-scene risk)`, pushing
+all training scenes to similar loss so the model can't exploit scene-specific shortcuts (the
+exact failure mode of behind_energy etc.). β-warmup 10 epochs (`eventnet/losses.py:vrex_loss`,
+`train.py --method vrex`).
+
+### β-screen (paper peak-level test, taw/V2/K=4, seed 42)
+| method | object | glass | ghost | **F1-mean** |
+|---|--:|--:|--:|--:|
+| ERM | 0.755 | 0.280 | 0.595 | **0.543** |
+| V-REx β=1 | 0.755 | 0.287 | 0.599 | **0.547** |
+| V-REx β=10 | 0.748 | 0.260 | 0.564 | **0.524** |
+| V-REx β=30 | 0.754 | 0.250 | 0.515 | **0.506** |
+
+**Negative.** Meaningful DG strength (β=10, 30) monotonically *hurts* test and glass; β=1
+is +0.004 over ERM — within the ±0.03 cross-scene noise band, and at β=1 the penalty is
+barely engaged (≈ERM). On *validation* (train scenes) V-REx drops monotonically with β
+(0.691→0.674→0.652→0.649) — the expected in-distribution↔robustness trade — but it does **not**
+convert into held-out test gains. This reproduces Gulrajani & Lopez-Paz 2021 ("tuned V-REx ≈
+tuned ERM").
+
+**2-seed confirm (ERM vs V-REx β=1, seeds 42 & 43):**
+| method | F1 s42 / s43 | **F1-mean** | glass-mean |
+|---|--|--:|--:|
+| ERM | 0.543 / 0.519 | **0.531** | 0.273 |
+| V-REx β=1 | 0.547 / 0.531 | **0.539** | 0.276 |
+
+V-REx β=1 is **+0.008 F1 / +0.003 glass** over ERM — positive in both seeds but **inside the
+±0.03 noise band, and glass (the target class) does not move**. Since β=1 barely applies the
+penalty (≈ERM) while the settings that *actually* enforce invariance (β=10/30) hurt, the honest
+verdict is **V-REx ≈ ERM (no meaningful gain)**. (Note ERM here is 0.531 vs 0.555 for the same
+taw/V2 on the prior 4-col cache — again the ±0.03 run/cache variance; the true headline is
+~0.55 ± 0.03.)
+
+Why DG can't rescue it here: V-REx only enforces invariance that *exists* in the
+representation. We showed glass's cue **sign-flips across scenes** in this `taw`/event space,
+so there is no invariant glass feature for V-REx to lock onto — only a representation with a
+genuinely range-decoupled glass cue (e.g. transient-NeRF transmittance) could. Also: only 7
+training environments (few for DG), and model selection uses a *train-scene* val (a known DG
+evaluation weakness). **Verdict: both feature-engineering and DG-training leave the headline at
+V2 `taw` ≈ 0.555; closing the 0.555→0.599 gap needs a different representation, not a new loss
+or feature.**
+
+---
+
+## V4 — NeRF-style transmittance profile (lightweight Option A) — negative result
+
+The most principled feature-level NeRF idea: attach to each event the **peak-anchored
+transmittance survival curve** `Tp(δ) = T(peak+δ)` for δ∈{0,8,16,32,64} (the NeRF
+`T(r)=exp(−∫σ)` decay, sampled depth-*relative* so it is translation-invariant in range —
+designed to dodge the absolute-position confound that sank raw behind_energy). Mode `tawT` =
+`taw` + the 5-sample profile, fed to V2 (`eventnet/events.py` 12-col cache, `data.py` TP_COLS).
+
+The decay **shape** is gorgeously class-separating at the feature level (per-class medians):
+
+| class | Tp(0) | Tp(8) | Tp(16) | Tp(32) | Tp(64) |
+|---|--:|--:|--:|--:|--:|
+| object | 0.486 | 0.077 | 0.044 | 0.018 | 0.004 |
+| glass | 0.734 | **0.560** | **0.248** | 0.101 | 0.025 |
+| ghost | 0.071 | 0.009 | 0.005 | 0.000 | 0.000 |
+
+Glass decays slowly (partial transmission → light survives ~8–16 bins behind), object fast.
+But the **cheap per-scene transferability diagnostic was discouraging** — the shape's leading
+scalar indicators still flip on the same scenes (decay-ratio Tp8/Tp0 glass-vs-object AUC:
+mean 0.55, range [0.31, 0.68], flips on gym_build & 14build_7floor & 36build). We trained it
+anyway (the net uses the full 5-D nonlinear shape a scalar AUC can't capture).
+
+### Result (paper peak-level F1, K=4, V2, 2 seeds)
+| mode | F1 s42/s43 | **F1-mean** | glass s42/s43 | **glass-mean** |
+|---|--|--:|--|--:|
+| taw (control) | 0.540 / 0.536 | **0.538** | 0.277 / 0.278 | 0.278 |
+| tawT | 0.536 / 0.536 | **0.536** | 0.306 / 0.264 | 0.285 |
+
+**Negative: tawT ≈ taw** (F1 −0.002, glass +0.007 — within ±0.03, and tawT's glass swings
+0.264–0.306 across seeds while taw's is stable). The multivariate transmittance shape does
+**not** rescue what the scalars couldn't; the diagnostic correctly predicted it. So the
+feature-level NeRF (Option A) joins the non-transferable list.
+
+**This closes the off-the-current-representation search.** Five diffuse/transport features
+(width, behind_energy, decomposition D/I/L, radiometric range correction, NeRF transmittance
+profile) and one training-side method (V-REx DG) all fail to move glass transferably. The
+common root: in the per-event/peak space, glass's "what's behind" cue is geometry/scene-
+dependent (sign-flips across scenes), so no per-ray scalar/shape summary of it transfers. The
+only remaining lever is **Option B — a differentiable transport representation** (learn σ/T and
+an explicit direct-vs-indirect split end-to-end, modeling geometry rather than summarizing it),
+which is a substantial build and is itself under-determined from a single ray (needs spatial
+context / priors). Headline stays **V2 `taw` ≈ 0.55 ± 0.03 (≈93% of the FWL-ToPM 0.599)**.
+
+---
+
+## Architecture / training search (loss, spatial attention) — no robust gain
+
+To check whether the *current architecture/training* (not the representation) was the
+bottleneck, we searched two natural, glass-targeted levers on `taw`/V2/K=4 (2 seeds, paper
+peak-level test; base = V2 taw control on the 12-col cache).
+
+### (1) Loss — glass class-weight & focal
+| 2-seed mean | F1 | glass | object | ghost |
+|---|--:|--:|--:|--:|
+| base (weighted CE [.2,1,2,2]) | 0.534 | 0.268 | 0.747 | 0.587 |
+| glass×1.5 ([.2,1,3,2]) | 0.534 | 0.285 | 0.731 | 0.586 |
+| glass×3 / focal (seed 42 only) | 0.534 / 0.535 | 0.293 / 0.296 | 0.730 / 0.739 | — |
+
+Glass weighting *does* move glass, but it is a **precision/recall trade** (glass up, object
+down) that leaves F1-mean flat, and the gain is **not seed-robust**: glass×1.5 Δglass =
++0.034 (seed 42) but +0.002 (seed 43), 2-seed mean +0.018 (≈ noise). So loss tuning
+redistributes between classes but does not lift the headline.
+
+### (2) Spatial attention at the U-Net bottleneck (`v2sa`, +1.06 M params) — INCONCLUSIVE
+| cfg | val_F1 | val_glass | test_F1 | test_glass |
+|---|--:|--:|--:|--:|
+| base (v2) s42/s43 | 0.698 / 0.698 | 0.542 / 0.546 | 0.536 / 0.531 | 0.266 / 0.269 |
+| v2sa s42/s43 | 0.662 / 0.671 | 0.491 / 0.509 | 0.516 / 0.529 | **0.155 / 0.247** |
+
+v2sa is lower than base on **test AND val** (val_F1 0.67 vs 0.70, val_glass 0.50 vs 0.54).
+**This is NOT overfitting** (overfit = val↑/test↓); v2sa fits even the *training* scenes worse
+→ it is **under-trained / unstable**, not "attention is bad for generalization." Cause:
+spatial attention was bolted onto the unchanged CNN recipe (LR 1e-3 flat-cosine, no warmup,
+BatchNorm, 40 ep); attention modules typically need LR warmup / lower LR / norm-first, and the
+large test-glass seed spread (0.155 vs 0.247) is a training-instability signature. **So the
+spatial-attention result is inconclusive** — a fair test needs attention-appropriate training
+(warmup + lower/decoupled LR, more epochs, GroupNorm). *(Correction: an earlier version of this
+section wrongly called this a "cross-scene overfit"; the val numbers refute that.)*
+
+**Verdict:** of the two glass-targeted levers, loss-tuning only **trades classes** (F1 flat,
+not seed-robust) and spatial-attention (as trained) is **inconclusive (under-trained)**. Net:
+no architecture/training change *robustly lifts* the held-out headline yet, but — unlike the
+representation/feature experiments — these are **not clean negatives**; the arch/training space
+is genuinely under-explored (attention needs proper training; EMA/aug/backbone untried). So
+"is the current architecture best?" → **no, and it remains the most plausible under-tested
+lever**, but a fair attempt requires training recipes matched to the new modules.
+Headline unchanged: **V2 `taw` ≈ 0.55 ± 0.03**. (Caveat: this is a 2-lever probe, not an
+exhaustive NAS; untried knobs like EMA/stronger-aug/different backbone exist, but both
+glass-targeted attempts failed and the capacity-hurts result argues against scaling up.)
 
 ---
 

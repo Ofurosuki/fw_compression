@@ -34,8 +34,10 @@ def extract_frame_events(
     """vox_crop: raw (X, Y, T) float32 (already y/z cropped).
 
     Returns:
-        events: (X, Y, k, 7) float32 — columns
-            ``[t_bin, a_height, w_fwhm_bin, E_behind, D_after, I_after, I_local]``.
+        events: (X, Y, k, 12) float32 — columns
+            ``[t_bin, a_height, w_fwhm_bin, E_behind, D_after, I_after, I_local,
+               Tp0, Tp8, Tp16, Tp32, Tp64]`` where ``Tp{δ}`` is the peak-anchored
+            transmittance survival at peak+δ (the NeRF-style decay profile).
         valid:  (X, Y, k) bool.
 
     Beyond (t, a, w) we attach a **direct/indirect waveform decomposition** (the
@@ -92,10 +94,20 @@ def extract_frame_events(
     hi = (t_idx + Wl).clamp(0, T - 1)
     i_local = ((g(cs_res, hi) - g(cs_res, lo)) / total).clamp(0.0, 1.0)
 
-    extra = torch.stack([e_behind, d_after, i_after, i_local], dim=-1)   # (N, k, 4)
-    events = torch.cat([events, extra], dim=-1)                          # (N, k, 7)
+    # NeRF-style transmittance survival profile, PEAK-ANCHORED (depth-relative):
+    # Tp(δ) = fraction of total ray energy strictly beyond (peak + δ) = transmittance
+    # at peak+δ. Sampling the decay shape over δ captures the glass "partial-drop-then-
+    # plateau" signature; anchoring at the peak makes it translation-invariant in depth
+    # (avoids the absolute-position confound that sank raw behind_energy).
+    TP_OFFS = (0, 8, 16, 32, 64)
+    tp = []
+    for off in TP_OFFS:
+        idx = (t_idx + off).clamp(0, T - 1)
+        tp.append(((total - g(cs, idx)) / total).clamp(0.0, 1.0))        # (N, k)
+    extra = torch.stack([e_behind, d_after, i_after, i_local] + tp, dim=-1)  # (N, k, 4+5)
+    events = torch.cat([events, extra], dim=-1)                          # (N, k, 12)
     events[~vmask] = 0.0
-    events = events.reshape(X, Y, k, 7).cpu().numpy().astype(np.float32)
+    events = events.reshape(X, Y, k, 12).cpu().numpy().astype(np.float32)
     valid = vmask.reshape(X, Y, k).cpu().numpy()
     return events, valid
 

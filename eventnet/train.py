@@ -17,7 +17,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from eventnet.data import EventFrameDataset, feature_dim
-from eventnet.losses import masked_weighted_ce
+from eventnet.losses import masked_focal, masked_weighted_ce, vrex_loss
 from eventnet.metrics import event_confusion, f1_from_cm
 from eventnet.model import build_model, count_params
 from eventnet.paths import NUM_CLASSES
@@ -41,13 +41,22 @@ def main():
     ap.add_argument("--K", type=int, default=4)
     ap.add_argument("--feature_mode", default="tdtaw",
                     choices=["t_only", "t_dt", "ta", "tdta", "taw", "tdtaw",
-                             "taE", "tdtaE", "tdtaEw", "tawD", "tawI", "tawi"])
+                             "taE", "tdtaE", "tdtaEw", "tawD", "tawI", "tawi",
+                             "tawT", "tT"])
     ap.add_argument("--frame_stride", type=int, default=7)
     ap.add_argument("--batch_size", type=int, default=8)
     ap.add_argument("--epochs", type=int, default=40)
     ap.add_argument("--lr", type=float, default=1e-3)
+    ap.add_argument("--warmup_epochs", type=int, default=0)
     ap.add_argument("--weight_decay", type=float, default=1e-4)
-    ap.add_argument("--arch", default="v1", choices=["v1", "v2"])
+    ap.add_argument("--arch", default="v1", choices=["v1", "v2", "v2sa"])
+    ap.add_argument("--method", default="erm", choices=["erm", "vrex"],
+                    help="erm=pooled CE; vrex=domain-generalization (scene=environment)")
+    ap.add_argument("--loss", default="ce", choices=["ce", "focal"],
+                    help="erm loss type (vrex always uses weighted CE)")
+    ap.add_argument("--focal_gamma", type=float, default=2.0)
+    ap.add_argument("--vrex_beta", type=float, default=10.0, help="V-REx penalty weight")
+    ap.add_argument("--vrex_warmup", type=int, default=10, help="epochs at beta=0 before ramp")
     ap.add_argument("--emb_dim", type=int, default=0, help="0 = arch default (v1:32, v2:48)")
     ap.add_argument("--base_channels", type=int, default=64)
     ap.add_argument("--attn_heads", type=int, default=4)
@@ -83,7 +92,15 @@ def main():
     print(f"arch={args.arch} params={count_params(model)/1e6:.2f}M  in_dim={feature_dim(args.feature_mode)}")
     cw = torch.tensor(args.class_weights, dtype=torch.float32)
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-    sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=args.epochs)
+    if args.warmup_epochs > 0:                          # linear warmup -> cosine (attn-friendly)
+        warm = torch.optim.lr_scheduler.LinearLR(
+            opt, start_factor=0.02, total_iters=args.warmup_epochs)
+        cos = torch.optim.lr_scheduler.CosineAnnealingLR(
+            opt, T_max=max(1, args.epochs - args.warmup_epochs))
+        sched = torch.optim.lr_scheduler.SequentialLR(
+            opt, [warm, cos], milestones=[args.warmup_epochs])
+    else:
+        sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=args.epochs)
 
     best = -1.0
     history = []
@@ -91,12 +108,23 @@ def main():
         model.train()
         t0 = time.time()
         tot = 0.0
+        pen = 0.0
+        # V-REx: ramp beta from 0 after the warmup (Krueger 2021 anneal)
+        beta = 0.0
+        if args.method == "vrex" and ep >= args.vrex_warmup:
+            beta = args.vrex_beta
         for b in tl:
             ev = b["events"].to(device)
             lab = b["labels"].to(device)
             val = b["valid"].to(device)
             logits = model(ev, val)
-            loss = masked_weighted_ce(logits, lab, val, cw)
+            if args.method == "vrex":
+                loss, _, penalty = vrex_loss(logits, lab, val, b["scene"].to(device), cw, beta)
+                pen += float(penalty)
+            elif args.loss == "focal":
+                loss = masked_focal(logits, lab, val, cw, args.focal_gamma)
+            else:
+                loss = masked_weighted_ce(logits, lab, val, cw)
             opt.zero_grad()
             loss.backward()
             opt.step()
@@ -113,9 +141,10 @@ def main():
                         "val_per_class": per, "epoch": ep},
                        os.path.join(args.save_dir, "best.pth"))
             flag = " *"
-        print(f"ep{ep:02d} loss={tot/max(1,len(tl)):.4f} val_f1={f1m:.4f} "
-              f"obj={per['object']:.3f} glass={per['glass']:.3f} ghost={per['ghost']:.3f} "
-              f"[{time.time()-t0:.0f}s]{flag}", flush=True)
+        print(f"ep{ep:02d} loss={tot/max(1,len(tl)):.4f} "
+              f"{'pen=%.4f β=%.1f ' % (pen/max(1,len(tl)), beta) if args.method=='vrex' else ''}"
+              f"val_f1={f1m:.4f} obj={per['object']:.3f} glass={per['glass']:.3f} "
+              f"ghost={per['ghost']:.3f} [{time.time()-t0:.0f}s]{flag}", flush=True)
 
     json.dump({"best_val_f1_mean": best, "history": history, "args": vars(args)},
               open(os.path.join(args.save_dir, "train_log.json"), "w"), indent=2)

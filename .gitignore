@@ -8,7 +8,14 @@ runs/**/*.npz
 runs/*cache*/
 # verbose run logs (keep the json/png results, drop the logs)
 *.log
+# model checkpoints + rerun recordings (large, regenerable)
+*.pth
+*.rrd
+# retrain/viz outputs (checkpoints, recordings — regenerable from the cached reps)
+downstream/outputs/retrain/
+downstream/outputs/vis/
 # local editor / Claude settings, large binaries
 .claude/
+.mcp.json
 *.pdf
 examples.png

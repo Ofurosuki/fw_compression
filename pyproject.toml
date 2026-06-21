@@ -5,12 +5,27 @@ description = "Lightweight encoder + DNN decoder compression for full-waveform L
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-  "torch>=2.7.0",
+  # torch/torchvision: cu128 (Blackwell sm_120) build — see [tool.uv.sources]
+  "torch==2.11.0",
+  "torchvision==0.26.0",
   "numpy>=1.24",
   "scipy>=1.10",
   "matplotlib>=3.7",
   "tqdm>=4.66",
   "blosc2>=4.4.2",
+  # Ghost-FWL / FWL-ToPM downstream stack (run via PYTHONPATH=<topm_repo>/src; these are
+  # the repo's runtime deps that our retrain/eval pipeline imports) + our config/viz deps.
+  # Pinned to the tested working set so `uv sync` reproduces it across machines.
+  "pyyaml==6.0.3",
+  "timm==1.0.27",
+  "einops==0.8.2",
+  "polars==1.41.2",
+  "wandb==0.27.2",
+  "scikit-learn==1.9.0",
+  "scikit-image==0.26.0",
+  "pandas==3.0.3",
+  "torchinfo==1.8.0",
+  "rerun-sdk==0.33.0",   # multi-echo point-cloud visualisation (downstream/vis_*)
 ]
 
 [dependency-groups]
@@ -30,6 +45,9 @@ environments = ["sys_platform == 'linux'"]
 
 [tool.uv.sources]
 torch = [
+  {index = "pytorch-cu128", marker = "sys_platform == 'linux'"},
+]
+torchvision = [
   {index = "pytorch-cu128", marker = "sys_platform == 'linux'"},
 ]
 

@@ -19,7 +19,10 @@ ap.add_argument("--out", default="downstream/outputs/events")
 ap.add_argument("--divide", default="3")
 cli = ap.parse_args()
 
-REPO = "/data3/user/yoshida/fwl_mae/neurips2026"
+import sys as _sys
+_sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import envconfig  # machine-dependent paths; see env.yaml.example
+REPO = envconfig.topm_repo_root()
 CFG = cli.config
 DIVIDE = cli.divide
 OUT = cli.out

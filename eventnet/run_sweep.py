@@ -13,7 +13,11 @@ from __future__ import annotations
 import argparse
 import os
 import subprocess
+import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import envconfig  # noqa: E402  (machine-dependent paths; see env.yaml.example)
 
 DEFAULT_JOBS = [
     ("t_only", 4), ("t_dt", 4), ("ta", 4), ("tdta", 4), ("taw", 4), ("tdtaw", 4),
@@ -34,7 +38,7 @@ def job_cmd(mode, k, gpu, save_root, epochs, frame_stride, eval_stride, extra):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--save_root", default="outputs/eventnet/sweep")
+    ap.add_argument("--save_root", default=envconfig.output_path("eventnet", "sweep"))
     ap.add_argument("--epochs", type=int, default=40)
     ap.add_argument("--frame_stride", type=int, default=7)
     ap.add_argument("--eval_stride", type=int, default=3)

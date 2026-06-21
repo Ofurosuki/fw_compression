@@ -10,7 +10,10 @@ import os
 import subprocess
 import threading
 
-REPO = "/data3/user/yoshida/fwl_mae/neurips2026"
+import sys as _sys
+_sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import envconfig  # machine-dependent paths; see env.yaml.example
+REPO = envconfig.topm_repo_root()
 OUT = "downstream/outputs/ckptvar"
 GPUS = ["cuda:0", "cuda:1", "cuda:2", "cuda:3"]
 DIVIDE = "3"

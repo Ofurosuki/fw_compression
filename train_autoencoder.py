@@ -21,6 +21,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
+import envconfig
 from compression.autoencoder import build_autoencoder, reconstruction_loss
 from compression.data.synthetic_waveforms import collate_waveforms
 
@@ -226,7 +227,7 @@ def main():
         print(f"Generating {args.data} data: train={args.n_train} val={args.n_val} T={args.T}")
         train_ds, val_ds, cfg = make_datasets(args.n_train, args.n_val, cfg=cfg, seed=args.seed)
 
-    run_dir = os.path.join("runs", args.run_name)
+    run_dir = os.path.join(envconfig.output_path("runs"), args.run_name)
     os.makedirs(run_dir, exist_ok=True)
     with open(os.path.join(run_dir, "config.json"), "w") as f:
         json.dump({**vars(args), "waveform_cfg": cfg.__dict__}, f, indent=2)

@@ -26,11 +26,12 @@ from __future__ import annotations
 import hashlib
 import os
 import pathlib
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
+import envconfig
 from compression.data.synthetic_waveforms import WaveformDataset, collate_waveforms  # re-export
 from compression.utils.metrics import measure_peak
 
@@ -42,7 +43,8 @@ SIGNAL_CLASSES = (1, 2, 3)
 @dataclass
 class RealWaveformConfig:
     T: int = 700
-    data_root: str = "ghost_datasets"
+    # the ghost_dataset directory on THIS machine (env.yaml); was the "ghost_datasets" symlink
+    data_root: str = field(default_factory=envconfig.data_root)
     annotation_subdir: str = "annotation_v1_expand"  # present in BOTH scenes (v1 is scene001-only)
     frames_per_scene: int = 30          # sampled evenly across the 2500 frames / 50 hist dirs
     pixels_per_frame: int = 2500        # labelled pixels kept per frame
@@ -50,7 +52,7 @@ class RealWaveformConfig:
     measure_half_window: int = 25       # window for model-free peak measurement
     merge_gap: int = 12                 # merge same-class annotation runs separated by < this many bins
     min_rel_height: float = 0.05        # drop reference peaks fainter than this fraction of the waveform max
-    cache_dir: str = "runs/real_cache"
+    cache_dir: str = field(default_factory=lambda: envconfig.cache_path("real_cache"))
 
 
 def _annotation_path(voxel_path: pathlib.Path, annotation_subdir: str) -> pathlib.Path:

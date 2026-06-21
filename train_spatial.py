@@ -20,6 +20,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
+import envconfig
 from compression.spatial_coding import build_spatial_autoencoder
 from compression.data.spatial_waveforms import (
     SpatialWaveformConfig,
@@ -174,7 +175,7 @@ def main():
         train_ds, val_ds, cfg = make_datasets_spatial_cv(args.cv, cfg=cfg, seed=args.seed)
         print(f"[spatial CV-{args.cv}] train={len(train_ds)} val={len(val_ds)} patches P={P} T={args.T}")
 
-    run_dir = os.path.join("runs", args.run_name)
+    run_dir = os.path.join(envconfig.output_path("runs"), args.run_name)
     os.makedirs(run_dir, exist_ok=True)
     with open(os.path.join(run_dir, "config.json"), "w") as f:
         json.dump({**vars(args), "P": P, "spatial_cfg": cfg.__dict__}, f, indent=2)

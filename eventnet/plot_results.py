@@ -13,6 +13,10 @@ import argparse
 import glob
 import json
 import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import envconfig  # noqa: E402  (machine-dependent paths; see env.yaml.example)
 
 import matplotlib
 matplotlib.use("Agg")
@@ -43,7 +47,7 @@ def fmt_table(rows):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--sweep_root", default="outputs/eventnet/sweep")
+    ap.add_argument("--sweep_root", default=envconfig.output_path("eventnet", "sweep"))
     ap.add_argument("--out_dir", default=None)
     args = ap.parse_args()
     out = args.out_dir or os.path.join(args.sweep_root, "plots")

@@ -28,12 +28,17 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
+
+# repo root on sys.path so `import envconfig` works when run as `python downstream/run_eval.py`
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import numpy as np
 import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+import envconfig
 from hist_lidar.config import load_config_from_yaml
 from hist_lidar.data import VoxelDatasetWithToMe, voxel_collate_fn
 from hist_lidar.data import dataset_voxel as _dv
@@ -328,6 +333,10 @@ def main():
     args = ap.parse_args()
 
     config = load_config_from_yaml(args.config)
+    # rebase the config's absolute dataset dirs + ToPM checkpoint onto THIS machine (env.yaml)
+    config.test_voxel_dirs = [envconfig.remap_data_dir(d) for d in config.test_voxel_dirs]
+    config.test_annotation_dirs = [envconfig.remap_data_dir(d) for d in config.test_annotation_dirs]
+    config.checkpoint_path = envconfig.remap_topm(config.checkpoint_path)
     if args.device:
         config.device = args.device
     if args.ckpt:

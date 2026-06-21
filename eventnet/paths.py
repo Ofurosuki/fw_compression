@@ -24,8 +24,14 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
+_REPO_ROOT = os.path.dirname(_HERE)
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+import envconfig  # noqa: E402  (machine-dependent paths; see env.yaml.example)
+
 SPLIT_JSON = os.path.join(_HERE, "split2_dirs.json")
 
 # downstream crop constants (evalA_split2_test_best.yaml)
@@ -39,12 +45,21 @@ NUM_CLASSES = 4
 LABEL_MAP = {0: "noise", 1: "object", 2: "glass", 3: "ghost"}
 SIGNAL_CLASSES = [1, 2, 3]  # object, glass, ghost (Noise excluded from the mean)
 
-# default cache location (events are small; raw voxels are not cached)
-CACHE_ROOT = "/data3/yoshida_eventnet_cache"
+# default cache location (events are small; raw voxels are not cached) — on the local
+# fast-disk cache_root (env.yaml), not NFS.
+CACHE_ROOT = envconfig.cache_path("eventnet")
 
 
 def load_split():
-    return json.load(open(SPLIT_JSON))
+    """SPLIT2 dir lists, with each dataset path remapped to THIS machine's data_root
+    (and annotation_v1 -> annotation_v1_expand). The split2_dirs.json may hold absolute
+    paths from whatever machine generated it; remap_data_dir rebases them here."""
+    split = json.load(open(SPLIT_JSON))
+    for d in split.values():
+        for key in ("voxel", "ann"):
+            if key in d:
+                d[key] = [envconfig.remap_data_dir(p) for p in d[key]]
+    return split
 
 
 def frame_files(voxel_dir: str, ann_dir: str):

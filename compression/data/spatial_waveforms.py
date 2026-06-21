@@ -24,10 +24,12 @@ from __future__ import annotations
 import hashlib
 import os
 import pathlib
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from typing import Dict, List, Optional
 
 import numpy as np
+
+import envconfig
 
 from compression.data.real_waveforms import (
     CV_SPLITS,
@@ -45,7 +47,7 @@ from compression.data.real_waveforms import (
 @dataclass
 class SpatialWaveformConfig:
     T: int = 700
-    data_root: str = "ghost_datasets"
+    data_root: str = field(default_factory=envconfig.data_root)
     annotation_subdir: str = "annotation_v1_expand"
     block: int = 4                      # Mr = Mc = block (spatial patch side)
     frames_per_scene: int = 30
@@ -54,7 +56,7 @@ class SpatialWaveformConfig:
     measure_half_window: int = 25
     merge_gap: int = 12
     min_rel_height: float = 0.05
-    cache_dir: str = "runs/real_cache_spatial"
+    cache_dir: str = field(default_factory=lambda: envconfig.cache_path("real_cache_spatial"))
 
     def as_real_cfg(self) -> RealWaveformConfig:
         return RealWaveformConfig(

@@ -37,6 +37,7 @@ for _p in (_ROOT, _HERE):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
+import envconfig  # noqa: E402  (machine-dependent paths; see env.yaml.example)
 import run_eval  # noqa: E402  event_voxel / compress_voxel / load_ae
 
 from hist_lidar.config import load_config_from_yaml          # noqa: E402
@@ -103,6 +104,9 @@ def main():
     args = ap.parse_args()
 
     config = load_config_from_yaml(args.config)
+    config.test_voxel_dirs = [envconfig.remap_data_dir(d) for d in config.test_voxel_dirs]
+    config.test_annotation_dirs = [envconfig.remap_data_dir(d) for d in config.test_annotation_dirs]
+    config.checkpoint_path = envconfig.remap_topm(config.checkpoint_path)
     if args.device:
         config.device = args.device
     if args.ckpt:

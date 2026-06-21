@@ -8,7 +8,10 @@ import os
 import subprocess
 import threading
 
-REPO = "/data3/user/yoshida/fwl_mae/neurips2026"
+import sys as _sys
+_sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import envconfig  # machine-dependent paths; see env.yaml.example
+REPO = envconfig.topm_repo_root()
 CFG = "downstream/configs/evalA_split2_test.yaml"
 DIVIDE = "3"
 OUT = "downstream/outputs/sweep_ah"

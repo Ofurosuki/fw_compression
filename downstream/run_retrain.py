@@ -44,10 +44,11 @@ for _p in (_ROOT, _HERE):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
+import envconfig  # noqa: E402  (machine-dependent paths; see env.yaml.example)
 import run_eval  # noqa: E402  (hook installers + AE loader live here)
 
 # Default source configs.
-REPO = "/data3/user/yoshida/fwl_mae/neurips2026"
+REPO = envconfig.topm_repo_root()
 TRAIN_SRC = f"{REPO}/configs/vit3d_ikeda_vastai_train_split2_no-expand.yaml"
 EVAL_SRC = os.path.join(_HERE, "configs", "evalA_split2_test_best.yaml")
 
@@ -73,15 +74,10 @@ def cache_rel(path, cache_root):
 
 
 def _remap_dirs(dirs):
-    """This box's dataset layout: /data1 -> /data3 and annotation_v1 -> annotation_v1_expand
-    (the test metric uses the *expand* annotations, so train/val/test all use expand).
-    Matches the remap documented in FW_Event_Net/RESULTS.md."""
-    out = []
-    for d in dirs or []:
-        d = d.replace("/data1/", "/data3/")
-        d = d.replace("/annotation_v1/", "/annotation_v1_expand/")
-        out.append(d)
-    return out
+    """Rebase the train config's dataset dirs onto THIS machine's data_root and apply the
+    annotation_v1 -> annotation_v1_expand fix (the test metric uses the *expand*
+    annotations). See envconfig.remap_data_dir."""
+    return [envconfig.remap_data_dir(d) for d in (dirs or [])]
 
 
 def build_config(args):
@@ -159,7 +155,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--rep", choices=["none", "event", "ae"], default="none")
     ap.add_argument("--run_name", required=True)
-    ap.add_argument("--save_root", default=os.path.join(_HERE, "outputs", "retrain"))
+    ap.add_argument("--save_root", default=envconfig.output_path("retrain"))
     ap.add_argument("--config_train_src", default=TRAIN_SRC)
     ap.add_argument("--config_eval_src", default=EVAL_SRC)
     ap.add_argument("--device", default="cuda:0")

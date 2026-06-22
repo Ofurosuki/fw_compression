@@ -27,6 +27,7 @@ import json
 import os
 import sys
 
+import pyarrow  # noqa: E402,F401  (must precede torch — see run_eval.py; avoids a pyarrow native segfault)
 import numpy as np
 import torch
 from tqdm import tqdm

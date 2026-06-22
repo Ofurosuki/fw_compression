@@ -33,6 +33,11 @@ import sys
 # repo root on sys.path so `import envconfig` works when run as `python downstream/run_eval.py`
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# Import pyarrow BEFORE torch: pyarrow's bundled native libs must initialise first, otherwise
+# the later pandas/polars-> pyarrow import (via hist_lidar.training) segfaults on some systems
+# (e.g. Tiger / RTX A6000). Harmless where it isn't needed. Keep this above the torch import.
+import pyarrow  # noqa: E402,F401
+
 import numpy as np
 import torch
 from torch.utils.data import DataLoader

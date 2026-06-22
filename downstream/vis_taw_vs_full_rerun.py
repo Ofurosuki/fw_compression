@@ -25,6 +25,7 @@ import argparse
 import os
 import sys
 
+import pyarrow  # noqa: E402,F401  (must precede torch/rerun — avoids a pyarrow native segfault; see run_eval.py)
 import numpy as np
 import torch
 

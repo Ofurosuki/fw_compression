@@ -83,6 +83,20 @@ do not confuse the two.
 - Don't edit the Ghost-FWL repo (read-only). Reuse its dataset/metric via PYTHONPATH.
 - Reuse the repo's `calculate_metrics_from_confusion_matrix` (don't reimplement F1).
 - Long sweeps run in the background and fan over the 4 GPUs; confirm `rc=0` for all jobs.
+- **Training runs the agent launches MUST pass `--is_log`** (ToPM retrain via
+  `run_retrain.py`, and any other wandb-capable training) so the run logs to wandb
+  (`hist_lidar` project) for live human monitoring while the agent watches the text logs —
+  the two coexist. Requires `wandb login` / `WANDB_API_KEY` on the machine; use
+  `WANDB_MODE=offline` if the box has no wandb access (sync later).
 - A persistent **memory** lives at `~/.claude/projects/-home-yoshida-fw-compression/memory/`
   (`MEMORY.md` index auto-loads each session) — check it for prior context, and record
   non-obvious facts there.
+
+# Research MCP
+
+When using the research-context MCP server, pass the MCP token from the environment variable `RESEARCH_MCP_TOKEN`.
+
+After work:
+- call append_claude_update
+
+Never print the token in summaries or event notes.

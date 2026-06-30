@@ -34,6 +34,23 @@ def masked_focal(logits, labels, valid, class_weights, gamma=2.0):
     return (-w * (1.0 - pt) ** gamma * logpt).mean()
 
 
+def masked_dice(logits, labels, valid, signal_only=True, eps=1.0):
+    """Soft multi-class Dice loss over valid events. Dice directly optimises the
+    overlap (≈ F1), so it lifts precision AND recall together — the prec/rec
+    rebalancer that plain class-weighting can't do (reweighting only slides along
+    the tradeoff). ToPM trains with focal+dice; this is the missing 'dice'. Mean
+    over the signal classes {object, glass, ghost} (the headline metric)."""
+    C = logits.shape[-1]
+    m = valid.reshape(-1).float()
+    p = F.softmax(logits.reshape(-1, C), dim=1) * m[:, None]
+    oh = F.one_hot(labels.reshape(-1).clamp(0, C - 1), C).float() * m[:, None]
+    inter = (p * oh).sum(0)                          # [C]
+    denom = p.sum(0) + oh.sum(0)                      # [C]
+    dice = (2 * inter + eps) / (denom + eps)         # [C]
+    cls = slice(1, C) if signal_only else slice(0, C)
+    return 1.0 - dice[cls].mean()
+
+
 def vrex_loss(logits, labels, valid, scene, class_weights, beta):
     """V-REx (Krueger 2021): ERM + beta * Var over per-scene risks.
 

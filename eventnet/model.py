@@ -211,7 +211,8 @@ class EventTensorNetV2(nn.Module):
 
 
 def build_model(arch, K, in_dim, num_classes=4, emb_dim=None, base_channels=64,
-                attn_heads=4, attn_layers=2, unet_levels=3, spatial_attn=False):
+                attn_heads=4, attn_layers=2, unet_levels=3, spatial_attn=False,
+                depth=None, window_size=None, ffn_mult=None):
     if arch == "v1":
         return EventTensorNet(K, in_dim=in_dim, emb_dim=emb_dim or 32,
                               num_classes=num_classes, base_channels=base_channels)
@@ -221,6 +222,20 @@ def build_model(arch, K, in_dim, num_classes=4, emb_dim=None, base_channels=64,
                                 attn_heads=attn_heads, attn_layers=attn_layers,
                                 unet_levels=unet_levels,
                                 spatial_attn=spatial_attn or arch == "v2sa")
+    if arch == "setopm":
+        from eventnet.sparse_event_topm import SparseEventToPM
+        return SparseEventToPM(K, in_dim=in_dim, embed_dim=emb_dim or 192,
+                               depth=depth or 12, num_heads=attn_heads,
+                               window_size=window_size or 8, ffn_mult=ffn_mult or 2,
+                               num_classes=num_classes)
+    if arch in ("setopm2", "setopm3", "setopm2r"):  # hierarchical token-native model
+        from eventnet.sparse_event_topm import SparseEventToPMHier
+        return SparseEventToPMHier(K, in_dim=in_dim, embed_dim=emb_dim or 256,
+                                   levels=3, blocks_per_stage=2, num_heads=attn_heads,
+                                   window_size=window_size or 8, ffn_mult=ffn_mult or 2,
+                                   num_classes=num_classes,
+                                   global_bottleneck=(arch == "setopm3"),
+                                   rel_range_bias=(arch == "setopm2r"))
     raise ValueError(arch)
 
 

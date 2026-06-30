@@ -10,50 +10,52 @@
     "min_distance": 3,
     "fixed_width": 4.0,
     "fixed_amplitude": 1.0,
+    "kernel": "gaussian",
+    "emg_tau": 2.65,
     "dim": 6
   },
-  "macro_f1": 0.3308384949214852,
-  "macro_f1_4class": 0.4937020149281285,
+  "macro_f1": 0.33083849971863816,
+  "macro_f1_4class": 0.4937020187719765,
   "ignore_visualize_labels": [],
   "per_class_f1": {
-    "object": 0.42243287141026464,
-    "glass": 0.2199818954738543,
-    "ghost": 0.3501007178803367
+    "object": 0.42243289737010886,
+    "glass": 0.21998184295600373,
+    "ghost": 0.35010075882980185
   },
   "per_class_precision": {
-    "object": 0.600477905810537,
-    "glass": 0.15777490683274642,
-    "ghost": 0.24678335017007658
+    "object": 0.6004779009964106,
+    "glass": 0.1577748723992531,
+    "ghost": 0.24678338554816862
   },
   "per_class_recall": {
-    "object": 0.3258241894596976,
-    "glass": 0.36317232519055725,
-    "ghost": 0.6022265806436583
+    "object": 0.3258242217646307,
+    "glass": 0.3631722213566512,
+    "ghost": 0.6022266122967626
   },
   "confusion_matrix": [
     [
-      4501334323,
-      26653827,
+      4501334328,
+      26653829,
       12041802,
-      42340916
+      42340909
     ],
     [
-      64846158,
-      50429479,
-      24450455,
-      15049031
+      64846153,
+      50429484,
+      24450456,
+      15049030
     ],
     [
       9064446,
-      2522333,
-      6995255,
+      2522335,
+      6995253,
       679497
     ],
     [
-      7340630,
+      7340631,
       4376600,
-      849418,
-      19025830
+      849416,
+      19025831
     ]
   ],
   "checkpoint": "/data3/user/yoshida/fwl_mae/neurips2026/checkpoints/paper/pruning0.7merging0.9-vit3d-neurips-refactered/vit3d_lr0.0001_timm-cosine_epoch50_div3_aug-only-cutmix0.2_0.8/0512/vit3d_ordered_pruning_light_finetune_epoch_50_20260512_150711_0.02485.pth"

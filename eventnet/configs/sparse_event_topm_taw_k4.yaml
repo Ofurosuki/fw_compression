@@ -1,0 +1,35 @@
+# SparseEventToPM (arch=setopm) — taw K=4, fair recipe matched to FW_Event_Net V2.
+# Reproducibility record only; eventnet/train.py is argparse-driven (no YAML loader).
+# Run (per seed):
+#   PYTHONPATH=<topm_repo>/src .venv/bin/python -m eventnet.train \
+#     --arch setopm --feature_mode taw --K 4 --frame_stride 7 \
+#     --emb_dim 256 --depth 12 --ffn_mult 2 --window_size 8 --attn_heads 4 \
+#     --batch_size 8 --epochs 50 --lr 5e-4 --warmup_epochs 5 --amp \
+#     --num_workers 6 --seed 42 --device cuda:3 \
+#     --save_dir downstream/outputs/sparse_event_topm/taw_k4_s42
+# Eval (paper peak-level F1, test stride=3):
+#   .venv/bin/python -m eventnet.evaluate --checkpoint <save_dir>/best.pth \
+#     --frame_stride 3 --device cuda:3 --out <save_dir>/eval.json
+arch: setopm
+feature_mode: taw          # columns [t, a, w, m] -> in_dim 4
+K: 4
+emb_dim: 256
+depth: 12
+ffn_mult: 2
+window_size: 8
+attn_heads: 4
+amp: true                  # bf16 autocast (efficient attention is fp32-disabled on this build)
+batch_size: 8
+crop: [256, 256]
+epochs: 50
+lr: 5.0e-4
+warmup_epochs: 5
+weight_decay: 1.0e-4
+class_weights: [0.2, 1.0, 2.0, 2.0]
+frame_stride: 7            # train/val cache stride (2216 train / 479 val frames)
+params_M: 6.67
+notes: >
+  Token-native: keeps the K events of each ray as (h,w,k) tokens through every
+  block (no flatten-into-channels), windowed shifted spatial-event attention.
+  Comparison targets (paper peak-level F1, same test set/metric):
+  EventNet V2 taw K4 = 0.555, ToPM-retrain taw K4 = 0.582, full waveform = 0.595.

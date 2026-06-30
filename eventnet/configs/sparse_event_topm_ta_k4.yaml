@@ -1,0 +1,25 @@
+# SparseEventToPM (arch=setopm) — ta K=4 ablation (multi-echo: t,a, no width).
+# Identical recipe to sparse_event_topm_taw_k4.yaml except feature_mode=ta.
+# Tests whether the architecture reproduces the ToPM-retrain class trade-off
+# (taw helps ghost; ta helps glass). Run only after taw validates (staged plan).
+arch: setopm
+feature_mode: ta           # columns [t, a, m] -> in_dim 3
+K: 4
+emb_dim: 256
+depth: 12
+ffn_mult: 2
+window_size: 8
+attn_heads: 4
+amp: true
+batch_size: 8
+crop: [256, 256]
+epochs: 50
+lr: 5.0e-4
+warmup_epochs: 5
+weight_decay: 1.0e-4
+class_weights: [0.2, 1.0, 2.0, 2.0]
+frame_stride: 7
+notes: >
+  ToPM-retrain reference (paper peak-level): ta K4 = 0.574 vs taw K4 = 0.582;
+  per-class ta 0.738/0.339/0.645 (obj/glass/ghost) — ta beats taw on glass,
+  loses on ghost. EventNet V2 ta K4 = 0.534.

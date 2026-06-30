@@ -39,7 +39,7 @@ from eventnet.paths import NUM_CLASSES, T_CROPPED
 
 
 @torch.no_grad()
-def predict_frame(model, vox_crop, k, mode, device):
+def predict_frame(model, vox_crop, k, mode, device, amp=False):
     """Extract top-K events and predict a class per event.
 
     Returns (t_bin, a, w, valid, pred) each (X, Y, K)."""
@@ -47,7 +47,8 @@ def predict_frame(model, vox_crop, k, mode, device):
     ev = torch.from_numpy(events).to(device)
     val = torch.from_numpy(valid).to(device)
     feat = assemble_features(ev, val, mode)                       # (X,Y,K,F)
-    logits = model(feat.unsqueeze(0), val.unsqueeze(0))[0]        # (X,Y,K,C)
+    with torch.autocast("cuda", dtype=torch.bfloat16, enabled=amp):
+        logits = model(feat.unsqueeze(0), val.unsqueeze(0))[0]    # (X,Y,K,C)
     pred = logits.argmax(-1)
     pred = torch.where(val, pred, torch.zeros_like(pred))
     t_bin, a, w = ev[..., 0], ev[..., 1], ev[..., 2]
@@ -71,10 +72,13 @@ def main():
     model = build_model(ca.get("arch", "v1"), K=K, in_dim=feature_dim(mode),
                         num_classes=NUM_CLASSES, emb_dim=(ca.get("emb_dim") or None),
                         base_channels=ca["base_channels"], attn_heads=ca.get("attn_heads", 4),
-                        attn_layers=ca.get("attn_layers", 2), unet_levels=ca.get("unet_levels", 3))
+                        attn_layers=ca.get("attn_layers", 2), unet_levels=ca.get("unet_levels", 3),
+                        depth=ca.get("depth"), window_size=ca.get("window_size"),
+                        ffn_mult=ca.get("ffn_mult"))
     model.load_state_dict(ck["state_dict"])
     model.eval().to(device)
-    print(f"[eval] arch={ca.get('arch','v1')} {mode} K={K}  val_f1={ck.get('val_f1_mean'):.4f}")
+    amp = ca.get("arch") in ("setopm", "setopm2", "setopm3", "setopm2r")  # efficient attn needs bf16
+    print(f"[eval] arch={ca.get('arch','v1')} {mode} K={K}  val_f1={ck.get('val_f1_mean'):.4f}  amp={amp}")
 
     frames = paths.list_frames("test", frame_stride=args.frame_stride)
     if args.limit:
@@ -89,7 +93,7 @@ def main():
     for i, (vpath, apath) in enumerate(frames):
         vox = paths.apply_crop(load_blosc2(vpath).astype(np.float32))   # (X,Y,T)
         ann = paths.apply_crop(load_blosc2(apath))
-        t_bin, a, w, valid, pred = predict_frame(model, vox, K, mode, device)
+        t_bin, a, w, valid, pred = predict_frame(model, vox, K, mode, device, amp=amp)
 
         # event-level CM (at the net's own events; label = ann at exact bin)
         ev_lab = assign_labels(ann, np.stack([t_bin, a, w], -1), valid)

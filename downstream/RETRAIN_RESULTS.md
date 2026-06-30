@@ -106,10 +106,18 @@ voxel, +0.008/**−0.006** peak — seed43 ta *beats* taw at peak); **`full − 
 | rep | K | dim | ratio | **voxel** | **peak** | ghost (vox/peak) |
 |---|--:|--:|--:|--:|--:|--|
 | **full** | — | 700 | 1× | **0.533** | **0.595** | 0.607 / 0.715 |
+| taw | 6 | 18 | 39× | **0.540** | **0.595** | 0.605 / — |
+| taw | 5 | 15 | 47× | **0.529** | **0.585** | 0.606 / — |
 | taw | 4 | 12 | 58× | **0.531** | **0.582** | 0.626 / 0.722 |
+| taw | 3 | 9 | 78× | **0.532** | **0.581** | 0.594 / — |
 | taw | 2 | 6 | 117× | **0.503** | **0.554** | 0.537 / 0.637 |
 | ta | 4 | 8 | 88× | **0.515** | **0.574** | 0.547 / 0.645 |
 | ta | 2 | 4 | 175× | **0.508** | **0.565** | 0.521 / 0.612 |
+
+**taw saturates at full by K≈6**: K6 (39×) reaches full (peak 0.595 = full 0.595; voxel 0.540 ≈
+0.533), K2→K4→K6 rises monotonically, K4 already ~99 %. **K5/K6 were run on Tiger (RTX A6000)** as
+the multi-server pipeline validation (git+uv-sync+env.yaml) and agree with dragon's K2/K4/full —
+cross-machine consistent.
 
 - **taw ≈ full needs K=4** — taw K4 = 99.6 % voxel / 98 % peak of full, but **K2 = 94 % / 93 %**.
   The K4→K2 drop (−0.028 voxel / −0.028 peak) is **almost entirely ghost** (voxel 0.626→0.537,
@@ -119,6 +127,37 @@ voxel, +0.008/**−0.006** peak — seed43 ta *beats* taw at peak); **`full − 
 - **width's net value stays ≤ 0 across K and both metrics**: taw − ta = +0.016/+0.008 (K4,
   vox/peak) → **−0.005 / −0.011 (K2)** — at K=2 the multi-echo `ta` *edges out* `taw` in both
   metrics. Reinforces the 2-seed conclusion: pulse width does not add net F1.
+
+## AE reconstruction vs sparse events under retraining (the frozen-judge ranking REVERSES)
+
+The frozen-judge sweep (RESULTS.md §3–4) ranked the **spatial-4×4 anti-hallucination AE** as the
+best compression (~0.48 frozen). But that was a frozen model seeing OOD reconstructions. Redone
+under the architecture-controlled retrain protocol (retrain ToPM on each AE reconstruction; AE
+ckpts from `runs/real_split2_*`), seed 42, voxel, divide=3:
+
+| representation | ratio | **voxel** | **peak** | ghost (vox/peak) |
+|---|--:|--:|--:|--|
+| full | 1× | **0.533** | **0.595** | 0.607 / 0.715 |
+| **taw** K4 (sparse events) | 58× | **0.531** | **0.582** | 0.626 / 0.722 |
+| **ta** K4 (multi-echo) | 88× | **0.515** | **0.574** | 0.547 / 0.645 |
+| AE spatial-AH | 22× | **0.494** | **0.555** | 0.509 / 0.626 |
+| AE spatial-AH | 88× | **0.472** | **0.528** | 0.465 / 0.571 |
+| AE spatial (no AH) | 88× | **0.443** | **0.497** | 0.443 / 0.541 |
+| AE 1D-AH | 88× | **0.409** | **0.469** | 0.329 / 0.437 |
+
+- **Under fair retraining, the dense AE reconstruction LOSES to the sparse event representation**
+  (voxel + peak agree). At matched 88×, ta-K4 0.515/0.574 beats AE spatial-AH 0.472/0.528 (**+0.04/+0.05
+  peak**); best AE (spatial-AH 22×) 0.494/0.555 only ≈ taw-K2 (0.503/0.554, but at 117× vs 22×) and
+  stays below taw/ta-K4. The frozen judge ranked AE > events; **retraining reverses it** — an
+  MSE-optimised dense reconstruction smears the transport structure, while explicit top-K `(t,a,w)`
+  events preserve it. This is the payoff of re-evaluating AE under retraining (the frozen ranking was a
+  domain-shift artifact, like taw/ta).
+- **Anti-hallucination still helps under retraining**: spatial 88× AH vs no-AH = **+0.029 voxel /
+  +0.031 peak**. The model does *not* just learn to ignore hallucinated peaks — AH yields a genuinely
+  cleaner, more informative representation (a real improvement, not a frozen-judge artifact).
+- **Ghost is the AE weakness** (AE ghost 0.33–0.51 voxel ≪ taw/ta 0.52–0.63): the dense reconstruction
+  loses weak secondary returns the sparse event rep keeps explicitly (K≥2). spatial ≫ 1D; lower
+  compression helps AE (22× > 88×) but never reaches the event reps even at 4× less compression.
 
 ## Why width helps ghost but hurts glass (per-scene width diagnostic)
 

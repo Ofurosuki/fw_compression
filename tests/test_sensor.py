@@ -28,6 +28,8 @@ class TestGhostCalibration:
         assert GHOST.nms_bins == 9
         assert GHOST.width_search_bins == 10
         assert GHOST.max_fwhm_bins == 21
+        assert GHOST.background_win_bins == 59
+        assert GHOST.background_win_bins % 2 == 1
 
     def test_bin_is_one_nanosecond_of_round_trip(self):
         assert GHOST.bin_width_range_m == pytest.approx(0.1498962, abs=1e-7)

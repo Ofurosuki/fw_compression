@@ -58,6 +58,12 @@ class SensorCalibration:
     start_range_m: float = 0.0
     nms_sigmas: float = 2.0
 
+    #: Width of the moving average that estimates the background under a
+    #: candidate, for detection criteria that need one. Far wider than the
+    #: pulse, or the average is dragged down by the echo it sits beneath.
+    #: Same multiple as the fog side, where it works out to 129 bins.
+    background_win_sigmas: float = 12.67
+
     @property
     def pulse_fwhm_bins(self) -> float:
         """The width to synthesise a return at when the representation does
@@ -83,6 +89,15 @@ class SensorCalibration:
         where the next candidate could be, never past it.
         """
         return int(math.ceil(self.min_distance_bins))
+
+    @property
+    def background_win_bins(self) -> int:
+        """Odd, always: a symmetric moving average pads by half its length, so
+        an even kernel shifts the background against the trace it is
+        subtracted from.
+        """
+        win = int(round(self.background_win_sigmas * self.pulse_sigma_bins))
+        return win + 1 if win % 2 == 0 else win
 
     @property
     def max_fwhm_bins(self) -> int:

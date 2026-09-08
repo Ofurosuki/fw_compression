@@ -35,6 +35,7 @@ from hist_lidar.data import dataset_voxel as _dv
 from hist_lidar.utils import get_model, load_checkpoint, set_seed
 
 from run_eval import install_event_hook        # downstream/ on sys.path (see __main__)
+from compression.sensor import GHOST
 
 LABEL = {0: "noise", 1: "object", 2: "glass", 3: "ghost"}
 OUT = "downstream/outputs/events/diag"
@@ -116,8 +117,8 @@ def main():
     model.eval()
 
     ep = {"k": 3, "representation": "taw", "intensity_mode": "height",
-          "smooth_sigma": 1.5, "min_height": 0.03, "min_distance": 3,
-          "fixed_width": 4.0, "fixed_amplitude": 1.0}
+          "smooth_sigma": 1.5, "min_height": 0.03, "min_distance": GHOST.nms_bins,
+          "fixed_width": GHOST.pulse_fwhm_bins, "fixed_amplitude": 1.0}
 
     ins_o, pred_o, anns = capture(model, cfg, device, "none", ep, args.max_frames)
     ins_e, pred_e, _ = capture(model, cfg, device, "event", ep, args.max_frames)

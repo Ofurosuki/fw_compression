@@ -39,6 +39,7 @@ from hist_lidar.config import load_config_from_yaml          # noqa: E402
 from hist_lidar.data import VoxelDatasetWithToMe              # noqa: E402
 from hist_lidar.training.test_unet3d import detect_peaks_in_voxel  # noqa: E402
 from hist_lidar.utils import get_model, load_checkpoint, set_seed  # noqa: E402
+from compression.sensor import GHOST
 
 
 def main():
@@ -51,8 +52,8 @@ def main():
     ap.add_argument("--event_intensity", default="height")
     ap.add_argument("--event_smooth_sigma", type=float, default=1.5)
     ap.add_argument("--event_min_height", type=float, default=0.03)
-    ap.add_argument("--event_min_distance", type=int, default=3)
-    ap.add_argument("--event_fixed_width", type=float, default=4.0)
+    ap.add_argument("--event_min_distance", type=int, default=GHOST.nms_bins)
+    ap.add_argument("--event_fixed_width", type=float, default=GHOST.pulse_fwhm_bins)
     ap.add_argument("--event_fixed_amplitude", type=float, default=1.0)
     ap.add_argument("--event_kernel", default="gaussian")
     ap.add_argument("--event_emg_tau", type=float, default=2.65)

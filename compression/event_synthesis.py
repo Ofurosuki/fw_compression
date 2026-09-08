@@ -18,6 +18,8 @@ from __future__ import annotations
 
 import math
 
+from compression.sensor import GHOST
+
 import numpy as np
 import torch
 
@@ -73,7 +75,7 @@ def synthesize_waveform_from_events(
     T: int = 700,
     representation: str = "taw",
     fixed_amplitude: float = 1.0,
-    fixed_width: float = 4.0,
+    fixed_width: float = GHOST.pulse_fwhm_bins,
     background: float = 0.0,
     normalize: bool = True,
 ):
@@ -126,7 +128,7 @@ def synthesize_batch(
     T: int = 700,
     representation: str = "taw",
     fixed_amplitude: float = 1.0,
-    fixed_width: float = 4.0,
+    fixed_width: float = GHOST.pulse_fwhm_bins,
     background: float = 0.0,
     normalize: bool = True,
     kernel: str = "gaussian",

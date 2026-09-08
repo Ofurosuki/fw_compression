@@ -37,6 +37,7 @@ for _p in (_ROOT, _HERE):
 
 import rerun as rr  # noqa: E402
 import run_eval     # noqa: E402  event_voxel
+from compression.sensor import GHOST  # noqa: E402
 
 from hist_lidar.config import load_config_from_yaml          # noqa: E402
 from hist_lidar.data import VoxelDatasetWithToMe             # noqa: E402
@@ -75,8 +76,8 @@ def main():
     ap.add_argument("--event_repr", default="taw")
     ap.add_argument("--event_smooth_sigma", type=float, default=1.5)
     ap.add_argument("--event_min_height", type=float, default=0.03)
-    ap.add_argument("--event_min_distance", type=int, default=3)
-    ap.add_argument("--event_fixed_width", type=float, default=4.0)
+    ap.add_argument("--event_min_distance", type=int, default=GHOST.nms_bins)
+    ap.add_argument("--event_fixed_width", type=float, default=GHOST.pulse_fwhm_bins)
     ap.add_argument("--device", default="cuda:0")
     ap.add_argument("--start", type=int, default=0)
     ap.add_argument("--num", type=int, default=20)

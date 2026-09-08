@@ -28,6 +28,8 @@ import math
 import numpy as np
 import torch
 
+from compression.sensor import GHOST
+
 
 # --------------------------------------------------------------------------- #
 # Reference: single-waveform scipy extractor (faithful to the plan spec).
@@ -37,7 +39,7 @@ def extract_topk_events(
     k: int,
     smooth_sigma: float = 1.5,
     min_prominence: float = 0.03,
-    min_distance: int = 3,
+    min_distance: int = GHOST.nms_bins,
     rank_by: str = "prominence",
     intensity_mode: str = "area",
 ):
@@ -128,9 +130,9 @@ def extract_topk_events_batch(
     k: int,
     smooth_sigma: float = 1.5,
     min_height: float = 0.03,
-    min_distance: int = 3,
+    min_distance: int = GHOST.nms_bins,
     intensity_mode: str = "height",
-    max_halfwidth: int = 40,
+    max_halfwidth: int = GHOST.width_search_bins,
 ):
     """Vectorised top-K event extraction for a batch of max-normalised waveforms.
 
@@ -190,7 +192,7 @@ def extract_topk_events_batch(
         geq = seg >= half
         right_run = torch.cumprod(geq[:, W + 1:].long(), dim=1).sum(dim=1)
         left_run = torch.cumprod(geq[:, :W].flip(1).long(), dim=1).sum(dim=1)
-        fwhm = (left_run + right_run + 1).clamp(1, 80).float()
+        fwhm = (left_run + right_run + 1).clamp(1, 2 * max_halfwidth + 1).float()
         if intensity_mode == "area":
             half_w = (fwhm / 2).long()
             mask = win.abs()[None, :] <= half_w[:, None]

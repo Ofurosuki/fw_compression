@@ -26,6 +26,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
 from hist_lidar.config import load_config_from_yaml
 from hist_lidar.utils import get_model, load_checkpoint, set_seed
 from diag_ghost_cases import capture
+from compression.sensor import GHOST
 
 LABEL = {0: "noise", 1: "object", 2: "glass", 3: "ghost"}
 OUT = "downstream/outputs/events/diag"
@@ -51,8 +52,8 @@ def main():
     load_checkpoint(cfg.checkpoint_path, model, device)
     model.eval()
     ep = {"k": 3, "representation": "taw", "intensity_mode": "height",
-          "smooth_sigma": 1.5, "min_height": 0.03, "min_distance": 3,
-          "fixed_width": 4.0, "fixed_amplitude": 1.0}
+          "smooth_sigma": 1.5, "min_height": 0.03, "min_distance": GHOST.nms_bins,
+          "fixed_width": GHOST.pulse_fwhm_bins, "fixed_amplitude": 1.0}
 
     ins_o, pred_o, anns = capture(model, cfg, device, "none", ep, args.max_frames)
     ins_e, pred_e, _ = capture(model, cfg, device, "event", ep, args.max_frames)

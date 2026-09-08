@@ -46,6 +46,7 @@ for _p in (_ROOT, _HERE):
 
 import envconfig  # noqa: E402  (machine-dependent paths; see env.yaml.example)
 import run_eval  # noqa: E402  (hook installers + AE loader live here)
+from compression.sensor import GHOST
 
 # Default source configs.
 REPO = envconfig.topm_repo_root()
@@ -175,8 +176,8 @@ def main():
     ap.add_argument("--event_intensity", choices=["height", "area"], default="height")
     ap.add_argument("--event_smooth_sigma", type=float, default=1.5)
     ap.add_argument("--event_min_height", type=float, default=0.03)
-    ap.add_argument("--event_min_distance", type=int, default=3)
-    ap.add_argument("--event_fixed_width", type=float, default=4.0)
+    ap.add_argument("--event_min_distance", type=int, default=GHOST.nms_bins)
+    ap.add_argument("--event_fixed_width", type=float, default=GHOST.pulse_fwhm_bins)
     ap.add_argument("--event_fixed_amplitude", type=float, default=1.0)
     ap.add_argument("--event_kernel", choices=["gaussian", "emg"], default="gaussian")
     ap.add_argument("--event_emg_tau", type=float, default=2.65)

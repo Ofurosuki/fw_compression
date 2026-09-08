@@ -50,6 +50,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import gc
 import glob
 import os
 import sys
@@ -139,6 +140,26 @@ def topk_peak_bins(score_trace: torch.Tensor, k: int, nms: int, min_height: floa
     return bins, valid
 
 
+def snap_to_raw_local_max(is_max: torch.Tensor, bins: torch.Tensor, radius: int):
+    """Move each selected bin to the nearest local maximum of the RAW trace.
+
+    A background-normalised score is not maximised where the raw trace is: the
+    divisor varies across the trace, so the score's peak sits a bin or two off
+    the photon peak. build_pool_variant does this snap for exactly that reason
+    -- the score says where an echo is, the raw trace says what its position
+    is -- and omitting it charges the criterion for a displacement that the
+    fog pipeline does not have. Slots with no raw local maximum within
+    ``radius`` keep their original bin and are marked unsnapped.
+    """
+    n_rays, n_bins = is_max.shape
+    offsets = torch.arange(-radius, radius + 1, device=bins.device)
+    offsets = offsets[offsets.abs().argsort(stable=True)]  # nearest first
+    probe = (bins[..., None] + offsets).clamp(0, n_bins - 1)
+    hit = torch.gather(is_max[:, None, :].expand(-1, bins.shape[1], -1), 2, probe)
+    snapped = torch.gather(probe, 2, hit.float().argmax(-1)[..., None]).squeeze(-1)
+    return torch.where(hit.any(-1), snapped, bins)
+
+
 def raw_local_max(raw: torch.Tensor) -> torch.Tensor:
     is_max = torch.zeros_like(raw, dtype=torch.bool)
     mid = raw[:, 1:-1]
@@ -161,7 +182,7 @@ def main():
     ap.add_argument("--k_keep", type=int, default=4)
     ap.add_argument("--tol_bins", type=int, default=5,
                     help="0.42 of the pulse FWHM, matching the fog side's 0.5 m")
-    ap.add_argument("--row_chunk", type=int, default=64)
+    ap.add_argument("--row_chunk", type=int, default=32)
     ap.add_argument("--device", default="cuda:1")
     args = ap.parse_args()
 
@@ -187,6 +208,8 @@ def main():
             voxel = load_blosc2(voxel_path)
             annotation = load_blosc2(ann_path)
             n_frames += 1
+            # This box is shared; a frame is 287 MB of voxel plus 143 MB of
+            # annotation, so hold one at a time and hand it back promptly.
 
             for band in ACCUMULATION_BANDS:
                 y0, y1, shots = band
@@ -207,6 +230,9 @@ def main():
                         min_height = 0.03 if criterion == "height" else None
                         pool_bins, pool_valid = topk_peak_bins(
                             trace, args.k_pool, GHOST.nms_bins, min_height)
+                        if criterion != "height":
+                            pool_bins = snap_to_raw_local_max(
+                                present_mask, pool_bins, GHOST.nms_bins // 2)
                         cache[criterion] = (pool_bins, pool_valid)
 
                     for label, name in LABEL_NAMES.items():
@@ -232,6 +258,10 @@ def main():
                             counts[(criterion, "kept", name, band)][0] += int(keep_hit.sum())
                             counts[(criterion, "kept", name, band)][1] += total
                     del raw, present_mask, cache
+                    torch.cuda.empty_cache()
+
+            del voxel, annotation
+            gc.collect()
 
     def rate(criterion, stage, name, band=None):
         if band is None:

@@ -8,15 +8,20 @@ candidate at that position?
 
 Three numbers per class, in increasing order of what they blame:
 
-  present   a local maximum exists at the annotated bin at all. Anything the
-            raw waveform does not show, no ranking can recover; this is the
-            ceiling for every criterion below.
-  pool      the annotated return is among the top K_POOL candidates.
-  kept      it is among the top K the representation actually transmits.
+  atbin     the annotated bin is itself a local maximum of the raw counts,
+            measured at that bin exactly with no tolerance. It is therefore
+            NOT a ceiling on the two columns beside it: those allow +/-tol,
+            where a candidate landing a bin or two away still counts, which is
+            why pool recall is far above it. Read it as how often the
+            annotation sits exactly on a peak -- it falls sharply in the
+            shallow accumulation bands, where shot noise moves the apparent
+            peak off the true one.
+  pool      the annotated return is within tol of one of the top K_POOL
+            candidates.
+  kept      within tol of one of the top K the representation transmits.
 
-The gap between ``present`` and ``pool`` is a ranking failure -- the return is
-visible and was passed over. The gap between ``pool`` and ``kept`` is the cost
-of the transmission budget. Splitting them matters because the fog side's
+The gap between ``pool`` and ``kept`` is the cost of the transmission budget;
+the gap between the criteria at equal K is the ranking. Splitting them matters because the fog side's
 whole gain came from the first gap (its ranker was near-exhausted while 16-19%
 of rays held no candidate near the true surface at all), and it is not obvious
 the same is true here.
